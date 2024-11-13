@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+
+
+<title>Job Management</title>
+
+<script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
+// be compatible with the behavior of Pandoc < 2.8).
+document.addEventListener('DOMContentLoaded', function(e) {
+  var hs = document.querySelectorAll("div.section[class*='level'] > :first-child");
+  var i, h, a;
+  for (i = 0; i < hs.length; i++) {
+    h = hs[i];
+    if (!/^h[1-6]$/i.test(h.tagName)) continue;  // it should be a header h1-h6
+    a = h.attributes;
+    while (a.length > 0) h.removeAttribute(a[0].name);
+  }
+});
+</script>
+
+<style type="text/css">
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+span.underline{text-decoration: underline;}
+div.column{display: inline-block; vertical-align: top; width: 50%;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+</style>
+
+
+
+<style type="text/css">
+code {
+white-space: pre;
+}
+.sourceCode {
+overflow: visible;
+}
+</style>
+<style type="text/css" data-origin="pandoc">
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+color: #aaaaaa;
+}
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } 
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.at { color: #7d9029; } 
+code span.bn { color: #40a070; } 
+code span.bu { color: #008000; } 
+code span.cf { color: #007020; font-weight: bold; } 
+code span.ch { color: #4070a0; } 
+code span.cn { color: #880000; } 
+code span.co { color: #60a0b0; font-style: italic; } 
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.do { color: #ba2121; font-style: italic; } 
+code span.dt { color: #902000; } 
+code span.dv { color: #40a070; } 
+code span.er { color: #ff0000; font-weight: bold; } 
+code span.ex { } 
+code span.fl { color: #40a070; } 
+code span.fu { color: #06287e; } 
+code span.im { color: #008000; font-weight: bold; } 
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.kw { color: #007020; font-weight: bold; } 
+code span.op { color: #666666; } 
+code span.ot { color: #007020; } 
+code span.pp { color: #bc7a00; } 
+code span.sc { color: #4070a0; } 
+code span.ss { color: #bb6688; } 
+code span.st { color: #4070a0; } 
+code span.va { color: #19177c; } 
+code span.vs { color: #4070a0; } 
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+</style>
+<script>
+// apply pandoc div.sourceCode style to pre.sourceCode instead
+(function() {
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
+    try { var rules = sheets[i].cssRules; } catch (e) { continue; }
+    var j = 0;
+    while (j < rules.length) {
+      var rule = rules[j];
+      // check if there is a div.sourceCode rule
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
+      var style = rule.style.cssText;
+      // check if color or background-color is set
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
+      // replace div.sourceCode by a pre.sourceCode rule
+      sheets[i].deleteRule(j);
+      sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
+    }
+  }
+})();
+</script>
+
+
+
+
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+#TOC {
+clear: both;
+margin: 0 0 10px 10px;
+padding: 4px;
+width: 400px;
+border: 1px solid #CCCCCC;
+border-radius: 5px;
+background-color: #f6f6f6;
+font-size: 13px;
+line-height: 1.3;
+}
+#TOC .toctitle {
+font-weight: bold;
+font-size: 15px;
+margin-left: 5px;
+}
+#TOC ul {
+padding-left: 40px;
+margin-left: -1.5em;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+#TOC ul ul {
+margin-left: -2em;
+}
+#TOC li {
+line-height: 16px;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+
+code > span.kw { color: #555; font-weight: bold; } 
+code > span.dt { color: #902000; } 
+code > span.dv { color: #40a070; } 
+code > span.bn { color: #d14; } 
+code > span.fl { color: #d14; } 
+code > span.ch { color: #d14; } 
+code > span.st { color: #d14; } 
+code > span.co { color: #888888; font-style: italic; } 
+code > span.ot { color: #007020; } 
+code > span.al { color: #ff0000; font-weight: bold; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">Job Management</h1>
+
+
+
+<div id="managing-databricks-jobs" class="section level1">
+<h1>Managing Databricks Jobs</h1>
+<p><code>{brickster}</code> provides full coverage of the Jobs REST
+API’s (specifically version 2.1), allowing creation of multi-task jobs
+via R code.</p>
+<div id="job-basics" class="section level2">
+<h2>Job Basics</h2>
+<p>When listing the jobs the default behaviour is to returns the first
+25 jobs, to configure the number of jobs returned you can specify
+<code>limit</code> and <code>offset</code>.</p>
+<p>The <code>expand_tasks</code> parameter will return task and cluster
+details for each job (default <code>FALSE)</code>.</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="co"># list all jobs within Databricks workspace</span></span>
+<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a><span class="co"># can control limit, offset, and if cluster/jobs details are returned</span></span>
+<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a>jobs <span class="ot">&lt;-</span> <span class="fu">db_jobs_list</span>(<span class="at">limit =</span> <span class="dv">10</span>)</span>
+<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a></span>
+<span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a><span class="co"># list all runs within a specific job</span></span>
+<span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a>job_runs <span class="ot">&lt;-</span> <span class="fu">db_jobs_runs_list</span>(<span class="at">job_id =</span> jobs[[<span class="dv">1</span>]]<span class="sc">$</span>job_id)</span></code></pre></div>
+<p>To return the details of a specific job you can use
+<code>db_jobs_get()</code>, this requires knowledge of the
+<code>job_id</code> which can be found via the user interface in
+Databricks or using <code>db_jobs_list()</code>.</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="co"># details of a specific job</span></span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a>job_details <span class="ot">&lt;-</span> <span class="fu">db_jobs_get</span>(<span class="at">job_id =</span> jobs[[<span class="dv">1</span>]]<span class="sc">$</span>job_id)</span></code></pre></div>
+<p>Each job has one or more tasks which may have dependence upon each
+other, execution of a job will flow through these tasks - this is known
+as a “run” of a job. Jobs can be scheduled to start a run on a
+particular schedule, or by a direct trigger such as
+<code>db_jobs_run_now()</code>.</p>
+<p>There are a number of functions that are specific to job runs
+execution and metadata:</p>
+<table>
+<colgroup>
+<col width="59%" />
+<col width="40%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="right">Purpose</th>
+<th align="center">Function</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="right">Trigger new run of an existing job</td>
+<td align="center"><code>db_jobs_run_now()</code></td>
+</tr>
+<tr class="even">
+<td align="right">List runs of a job</td>
+<td align="center"><code>db_jobs_runs_list()</code></td>
+</tr>
+<tr class="odd">
+<td align="right">Retrieve metadata for a specific job run</td>
+<td align="center"><code>db_jobs_runs_get()</code></td>
+</tr>
+<tr class="even">
+<td align="right">Retrieve metadata for a specific task run</td>
+<td align="center"><code>db_jobs_runs_get_output()</code></td>
+</tr>
+<tr class="odd">
+<td align="right">Export code and/or dashboard for task run</td>
+<td align="center"><code>db_jobs_runs_export()</code></td>
+</tr>
+<tr class="even">
+<td align="right">Delete record of a job run</td>
+<td align="center"><code>db_jobs_runs_delete()</code></td>
+</tr>
+<tr class="odd">
+<td align="right">Cancel run of a job</td>
+<td align="center"><code>db_jobs_runs_cancel()</code></td>
+</tr>
+</tbody>
+</table>
+<p>When using functions such as <code>db_jobs_run_get_output()</code>
+and <code>db_jobs_runs_export()</code> the required <code>run_id</code>
+can refer to the id of a given task. Each task within a given “run” will
+also have a <code>run_id</code> that can be referenced.</p>
+</div>
+<div id="creating-jobs" class="section level2">
+<h2>Creating Jobs</h2>
+<p><code>{brickster}</code> enables creation of jobs from R, these jobs
+can be simple single task jobs or complex multi-task jobs with
+dependencies that share and re-use clusters.</p>
+<div id="simple-job" class="section level3">
+<h3>Simple Job</h3>
+<p>A single-task job can be created with the following components:</p>
+<ul>
+<li><p><code>job_task()</code> which defines a singular task</p></li>
+<li><p><code>new_cluster()</code> required by <code>job_task()</code>,
+it defines the compute specifications</p></li>
+<li><p><code>*_task()</code>, one of the task functions
+e.g. <code>notebook_task()</code></p></li>
+</ul>
+<p>Below is the creation of a simple job that runs a notebook and has a
+paused schedule:</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="co"># define a job task</span></span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>simple_task <span class="ot">&lt;-</span> <span class="fu">job_task</span>(</span>
+<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a>  <span class="at">task_key =</span> <span class="st">&quot;simple_task&quot;</span>,</span>
+<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>  <span class="at">description =</span> <span class="st">&quot;a simple task that runs a notebook&quot;</span>,</span>
+<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a>  <span class="co"># specify a cluster for the job</span></span>
+<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a>  <span class="at">new_cluster =</span> <span class="fu">new_cluster</span>(</span>
+<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a>    <span class="at">spark_version =</span> <span class="st">&quot;9.1.x-scala2.12&quot;</span>,</span>
+<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a>    <span class="at">driver_node_type_id =</span> <span class="st">&quot;m5a.large&quot;</span>,</span>
+<span id="cb3-9"><a href="#cb3-9" tabindex="-1"></a>    <span class="at">node_type_id =</span> <span class="st">&quot;m5a.large&quot;</span>,</span>
+<span id="cb3-10"><a href="#cb3-10" tabindex="-1"></a>    <span class="at">num_workers =</span> <span class="dv">2</span>,</span>
+<span id="cb3-11"><a href="#cb3-11" tabindex="-1"></a>    <span class="at">cloud_attr =</span> <span class="fu">aws_attributes</span>(<span class="at">ebs_volume_size =</span> <span class="dv">32</span>)</span>
+<span id="cb3-12"><a href="#cb3-12" tabindex="-1"></a>  ),</span>
+<span id="cb3-13"><a href="#cb3-13" tabindex="-1"></a>  <span class="co"># this task will be a notebook</span></span>
+<span id="cb3-14"><a href="#cb3-14" tabindex="-1"></a>  <span class="at">task =</span> <span class="fu">notebook_task</span>(<span class="at">notebook_path =</span> <span class="st">&quot;/brickster/simple-notebook&quot;</span>)</span>
+<span id="cb3-15"><a href="#cb3-15" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="co"># create job with simple task</span></span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>simple_task_job <span class="ot">&lt;-</span> <span class="fu">db_jobs_create</span>(</span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a>  <span class="at">name =</span> <span class="st">&quot;brickster example: simple&quot;</span>,</span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>  <span class="at">tasks =</span> <span class="fu">job_tasks</span>(simple_task),</span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>  <span class="co"># 9am every day, paused currently</span></span>
+<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a>  <span class="at">schedule =</span> <span class="fu">cron_schedule</span>(</span>
+<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a>    <span class="at">quartz_cron_expression =</span> <span class="st">&quot;0 0 9 * * ?&quot;</span>,</span>
+<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a>    <span class="at">pause_status =</span> <span class="st">&quot;PAUSED&quot;</span></span>
+<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a>  )</span>
+<span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a>)</span></code></pre></div>
+</div>
+<div id="multiple-tasks" class="section level3">
+<h3>Multiple Tasks</h3>
+<p>Jobs can be extended beyond a singular task, this next example
+extends the simple job example by now having three tasks. Each
+subsequent task depends on the priors completion before it can proceed,
+each task also will define its own <code>new_cluster</code>.</p>
+<p>Whilst this job runs the same notebook each time for the sake of
+example it demonstrates how to build dependencies.</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="co"># one cluster definition, repeatedly use for each task</span></span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a>multitask_cluster <span class="ot">&lt;-</span> <span class="fu">new_cluster</span>(</span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a>  <span class="at">spark_version =</span> <span class="st">&quot;9.1.x-scala2.12&quot;</span>,</span>
+<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a>  <span class="at">driver_node_type_id =</span> <span class="st">&quot;m5a.large&quot;</span>,</span>
+<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a>  <span class="at">node_type_id =</span> <span class="st">&quot;m5a.large&quot;</span>,</span>
+<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a>  <span class="at">num_workers =</span> <span class="dv">2</span>,</span>
+<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a>  <span class="at">cloud_attr =</span> <span class="fu">aws_attributes</span>(<span class="at">ebs_volume_size =</span> <span class="dv">32</span>)</span>
+<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a>)</span>
+<span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a></span>
+<span id="cb5-10"><a href="#cb5-10" tabindex="-1"></a><span class="co"># each task will run the same notebook (just for this example)</span></span>
+<span id="cb5-11"><a href="#cb5-11" tabindex="-1"></a>multitask_task <span class="ot">&lt;-</span> <span class="fu">notebook_task</span>(<span class="at">notebook_path =</span> <span class="st">&quot;/brickster/simple-notebook&quot;</span>)</span>
+<span id="cb5-12"><a href="#cb5-12" tabindex="-1"></a></span>
+<span id="cb5-13"><a href="#cb5-13" tabindex="-1"></a><span class="co"># create three simple tasks that will depend on each other</span></span>
+<span id="cb5-14"><a href="#cb5-14" tabindex="-1"></a><span class="co"># task_a -&gt; task_b -&gt; task_c</span></span>
+<span id="cb5-15"><a href="#cb5-15" tabindex="-1"></a>task_a <span class="ot">&lt;-</span> <span class="fu">job_task</span>(</span>
+<span id="cb5-16"><a href="#cb5-16" tabindex="-1"></a>  <span class="at">task_key =</span> <span class="st">&quot;task_a&quot;</span>,</span>
+<span id="cb5-17"><a href="#cb5-17" tabindex="-1"></a>  <span class="at">description =</span> <span class="st">&quot;First task in the sequence&quot;</span>,</span>
+<span id="cb5-18"><a href="#cb5-18" tabindex="-1"></a>  <span class="at">new_cluster =</span> multitask_cluster,</span>
+<span id="cb5-19"><a href="#cb5-19" tabindex="-1"></a>  <span class="at">task =</span> multitask_task</span>
+<span id="cb5-20"><a href="#cb5-20" tabindex="-1"></a>)</span>
+<span id="cb5-21"><a href="#cb5-21" tabindex="-1"></a></span>
+<span id="cb5-22"><a href="#cb5-22" tabindex="-1"></a>task_b <span class="ot">&lt;-</span> <span class="fu">job_task</span>(</span>
+<span id="cb5-23"><a href="#cb5-23" tabindex="-1"></a>  <span class="at">task_key =</span> <span class="st">&quot;task_b&quot;</span>,</span>
+<span id="cb5-24"><a href="#cb5-24" tabindex="-1"></a>  <span class="at">description =</span> <span class="st">&quot;Second task in the sequence&quot;</span>,</span>
+<span id="cb5-25"><a href="#cb5-25" tabindex="-1"></a>  <span class="at">new_cluster =</span> multitask_cluster,</span>
+<span id="cb5-26"><a href="#cb5-26" tabindex="-1"></a>  <span class="at">task =</span> multitask_task,</span>
+<span id="cb5-27"><a href="#cb5-27" tabindex="-1"></a>  <span class="at">depends_on =</span> <span class="st">&quot;task_a&quot;</span></span>
+<span id="cb5-28"><a href="#cb5-28" tabindex="-1"></a>)</span>
+<span id="cb5-29"><a href="#cb5-29" tabindex="-1"></a></span>
+<span id="cb5-30"><a href="#cb5-30" tabindex="-1"></a>task_c <span class="ot">&lt;-</span> <span class="fu">job_task</span>(</span>
+<span id="cb5-31"><a href="#cb5-31" tabindex="-1"></a>  <span class="at">task_key =</span> <span class="st">&quot;task_c&quot;</span>,</span>
+<span id="cb5-32"><a href="#cb5-32" tabindex="-1"></a>  <span class="at">description =</span> <span class="st">&quot;Third task in the sequence&quot;</span>,</span>
+<span id="cb5-33"><a href="#cb5-33" tabindex="-1"></a>  <span class="at">new_cluster =</span> multitask_cluster,</span>
+<span id="cb5-34"><a href="#cb5-34" tabindex="-1"></a>  <span class="at">task =</span> multitask_task,</span>
+<span id="cb5-35"><a href="#cb5-35" tabindex="-1"></a>  <span class="at">depends_on =</span> <span class="st">&quot;task_b&quot;</span></span>
+<span id="cb5-36"><a href="#cb5-36" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="co"># create job with multiple tasks</span></span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>multitask_job <span class="ot">&lt;-</span> <span class="fu">db_jobs_create</span>(</span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>  <span class="at">name =</span> <span class="st">&quot;brickster example: multi-task&quot;</span>,</span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>  <span class="at">tasks =</span> <span class="fu">job_tasks</span>(task_a, task_b, task_c),</span>
+<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>  <span class="co"># 9am every day, paused currently</span></span>
+<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a>  <span class="at">schedule =</span> <span class="fu">cron_schedule</span>(</span>
+<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a>    <span class="at">quartz_cron_expression =</span> <span class="st">&quot;0 0 9 * * ?&quot;</span>,</span>
+<span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a>    <span class="at">pause_status =</span> <span class="st">&quot;PAUSED&quot;</span></span>
+<span id="cb6-9"><a href="#cb6-9" tabindex="-1"></a>  )</span>
+<span id="cb6-10"><a href="#cb6-10" tabindex="-1"></a>)</span></code></pre></div>
+</div>
+<div id="cluster-reuse" class="section level3">
+<h3>Cluster Reuse</h3>
+<p>The multiple tasks example has one shortcoming - clusters are not
+reused between tasks and therefore each task will have to wait for
+another cluster to be started before its computations can begin, this
+will typically add a few minutes to each task.</p>
+<p>It can be advantageous to reuse clusters between job tasks to avoid
+overhead for short lived tasks, or to share resources for tasks which
+are not computationally demanding.</p>
+<p>This example is the same as the previous multi-task job however it
+now shares a single cluster for each task.</p>
+<p><code>new_cluster</code> is replaced with
+<code>job_cluster_key</code> in each task:</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a><span class="co"># create three simple tasks that will depend on each other</span></span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a><span class="co"># this time we will use a shared cluster to reduce startup overhead</span></span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a><span class="co"># task_a -&gt; task_b -&gt; task_c</span></span>
+<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a>task_a <span class="ot">&lt;-</span> <span class="fu">job_task</span>(</span>
+<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a>  <span class="at">task_key =</span> <span class="st">&quot;task_a&quot;</span>,</span>
+<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a>  <span class="at">description =</span> <span class="st">&quot;First task in the sequence&quot;</span>,</span>
+<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a>  <span class="at">job_cluster_key =</span> <span class="st">&quot;shared_cluster&quot;</span>,</span>
+<span id="cb7-8"><a href="#cb7-8" tabindex="-1"></a>  <span class="at">task =</span> multitask_task</span>
+<span id="cb7-9"><a href="#cb7-9" tabindex="-1"></a>)</span>
+<span id="cb7-10"><a href="#cb7-10" tabindex="-1"></a></span>
+<span id="cb7-11"><a href="#cb7-11" tabindex="-1"></a>task_b <span class="ot">&lt;-</span> <span class="fu">job_task</span>(</span>
+<span id="cb7-12"><a href="#cb7-12" tabindex="-1"></a>  <span class="at">task_key =</span> <span class="st">&quot;task_b&quot;</span>,</span>
+<span id="cb7-13"><a href="#cb7-13" tabindex="-1"></a>  <span class="at">description =</span> <span class="st">&quot;Second task in the sequence&quot;</span>,</span>
+<span id="cb7-14"><a href="#cb7-14" tabindex="-1"></a>  <span class="at">job_cluster_key =</span> <span class="st">&quot;shared_cluster&quot;</span>,</span>
+<span id="cb7-15"><a href="#cb7-15" tabindex="-1"></a>  <span class="at">task =</span> multitask_task,</span>
+<span id="cb7-16"><a href="#cb7-16" tabindex="-1"></a>  <span class="at">depends_on =</span> <span class="st">&quot;task_a&quot;</span></span>
+<span id="cb7-17"><a href="#cb7-17" tabindex="-1"></a>)</span>
+<span id="cb7-18"><a href="#cb7-18" tabindex="-1"></a></span>
+<span id="cb7-19"><a href="#cb7-19" tabindex="-1"></a>task_c <span class="ot">&lt;-</span> <span class="fu">job_task</span>(</span>
+<span id="cb7-20"><a href="#cb7-20" tabindex="-1"></a>  <span class="at">task_key =</span> <span class="st">&quot;task_c&quot;</span>,</span>
+<span id="cb7-21"><a href="#cb7-21" tabindex="-1"></a>  <span class="at">description =</span> <span class="st">&quot;Third task in the sequence&quot;</span>,</span>
+<span id="cb7-22"><a href="#cb7-22" tabindex="-1"></a>  <span class="at">job_cluster_key =</span> <span class="st">&quot;shared_cluster&quot;</span>,</span>
+<span id="cb7-23"><a href="#cb7-23" tabindex="-1"></a>  <span class="at">task =</span> multitask_task,</span>
+<span id="cb7-24"><a href="#cb7-24" tabindex="-1"></a>  <span class="at">depends_on =</span> <span class="st">&quot;task_b&quot;</span></span>
+<span id="cb7-25"><a href="#cb7-25" tabindex="-1"></a>)</span></code></pre></div>
+<p><code>job_clusters</code> is now defined in the
+<code>db_jobs_create()</code> call where it accepts a named list of
+<code>new_clusters()</code>, we will reuse our example from earlier:</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="co"># define job_clusters as a named list of new_cluster()</span></span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>multitask_job_with_reuse <span class="ot">&lt;-</span> <span class="fu">db_jobs_create</span>(</span>
+<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a>  <span class="at">name =</span> <span class="st">&quot;brickster example: multi-task with reuse&quot;</span>,</span>
+<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a>  <span class="at">job_clusters =</span> <span class="fu">list</span>(<span class="st">&quot;shared_cluster&quot;</span> <span class="ot">=</span> multitask_cluster),</span>
+<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a>  <span class="at">tasks =</span> <span class="fu">job_tasks</span>(task_a, task_b, task_c),</span>
+<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a>  <span class="co"># 9am every day, paused currently</span></span>
+<span id="cb8-7"><a href="#cb8-7" tabindex="-1"></a>  <span class="at">schedule =</span> <span class="fu">cron_schedule</span>(</span>
+<span id="cb8-8"><a href="#cb8-8" tabindex="-1"></a>    <span class="at">quartz_cron_expression =</span> <span class="st">&quot;0 0 9 * * ?&quot;</span>,</span>
+<span id="cb8-9"><a href="#cb8-9" tabindex="-1"></a>    <span class="at">pause_status =</span> <span class="st">&quot;PAUSED&quot;</span></span>
+<span id="cb8-10"><a href="#cb8-10" tabindex="-1"></a>  )</span>
+<span id="cb8-11"><a href="#cb8-11" tabindex="-1"></a>)</span></code></pre></div>
+<p>There can be multiple shared clusters and it may be beneficial to
+give some demanding tasks a larger cluster alone (or to share with other
+demanding tasks).</p>
+</div>
+<div id="one-off-jobs" class="section level3">
+<h3>One-off Jobs</h3>
+<p>It’s possible to create one-off jobs that do not have a schedule and
+only appears under the “jobs runs” tab, not “jobs”.
+<code>db_jobs_runs_submit()</code> permits the use of an
+<code>idempotency_token</code> which can avoid re-submission of a
+run.</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a><span class="co"># submit a one off job run</span></span>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a><span class="co"># reuse the simple task from first example</span></span>
+<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a><span class="co"># idempotency_token guarentees no additional triggers</span></span>
+<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a>oneoff_job <span class="ot">&lt;-</span> <span class="fu">db_jobs_runs_submit</span>(</span>
+<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a>  <span class="at">tasks =</span> <span class="fu">job_tasks</span>(simple_task),</span>
+<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a>  <span class="at">run_name =</span> <span class="st">&quot;brickster example: one-off job&quot;</span>,</span>
+<span id="cb9-7"><a href="#cb9-7" tabindex="-1"></a>  <span class="at">idempotency_token =</span> <span class="st">&quot;my_job_run_token&quot;</span></span>
+<span id="cb9-8"><a href="#cb9-8" tabindex="-1"></a>)</span></code></pre></div>
+</div>
+<div id="remote-git-repos" class="section level3">
+<h3>Remote Git Repos</h3>
+<p>Instead of using notebooks contained within the Databricks workspace
+a job can be referenced in an external git repository and reference a
+specific branch, tag, or commit.</p>
+<p>Let’s revisit the simple job example from before and adjust to use
+<code>git_source()</code>.<br />
+In this example the repo will have a folder <code>example</code> which
+contains <code>simple-notebook.py</code>.</p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a><span class="co"># define a job task</span></span>
+<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a><span class="co"># this time, the notebook_path is relative to the git root directory</span></span>
+<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a><span class="co"># omit file extensions like .py or .r</span></span>
+<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a>simple_task <span class="ot">&lt;-</span> <span class="fu">job_task</span>(</span>
+<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a>  <span class="at">task_key =</span> <span class="st">&quot;simple_task&quot;</span>,</span>
+<span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a>  <span class="at">description =</span> <span class="st">&quot;a simple task that runs a notebook&quot;</span>,</span>
+<span id="cb10-7"><a href="#cb10-7" tabindex="-1"></a>  <span class="co"># specify a cluster for the job</span></span>
+<span id="cb10-8"><a href="#cb10-8" tabindex="-1"></a>  <span class="at">new_cluster =</span> <span class="fu">new_cluster</span>(</span>
+<span id="cb10-9"><a href="#cb10-9" tabindex="-1"></a>    <span class="at">spark_version =</span> <span class="st">&quot;9.1.x-scala2.12&quot;</span>,</span>
+<span id="cb10-10"><a href="#cb10-10" tabindex="-1"></a>    <span class="at">driver_node_type_id =</span> <span class="st">&quot;m5a.large&quot;</span>,</span>
+<span id="cb10-11"><a href="#cb10-11" tabindex="-1"></a>    <span class="at">node_type_id =</span> <span class="st">&quot;m5a.large&quot;</span>,</span>
+<span id="cb10-12"><a href="#cb10-12" tabindex="-1"></a>    <span class="at">num_workers =</span> <span class="dv">2</span>,</span>
+<span id="cb10-13"><a href="#cb10-13" tabindex="-1"></a>    <span class="at">cloud_attr =</span> <span class="fu">aws_attributes</span>(<span class="at">ebs_volume_size =</span> <span class="dv">32</span>)</span>
+<span id="cb10-14"><a href="#cb10-14" tabindex="-1"></a>  ),</span>
+<span id="cb10-15"><a href="#cb10-15" tabindex="-1"></a>  <span class="co"># this task will be a notebook</span></span>
+<span id="cb10-16"><a href="#cb10-16" tabindex="-1"></a>  <span class="at">task =</span> <span class="fu">notebook_task</span>(<span class="at">notebook_path =</span> <span class="st">&quot;example/simple-notebook&quot;</span>)</span>
+<span id="cb10-17"><a href="#cb10-17" tabindex="-1"></a>)</span></code></pre></div>
+<p>Within the call to <code>db_jobs_create()</code> use
+<code>git_source()</code> to point to the repo containing the
+notebook.</p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a><span class="co"># create job with simple task</span></span>
+<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a>simple_task_job <span class="ot">&lt;-</span> <span class="fu">db_jobs_create</span>(</span>
+<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a>  <span class="at">name =</span> <span class="st">&quot;brickster example: simple&quot;</span>,</span>
+<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a>  <span class="at">tasks =</span> <span class="fu">job_tasks</span>(simple_task),</span>
+<span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a>  <span class="co"># git source points to repo</span></span>
+<span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a>  <span class="at">git_source =</span> <span class="fu">git_source</span>(</span>
+<span id="cb11-7"><a href="#cb11-7" tabindex="-1"></a>    <span class="at">git_url =</span> <span class="st">&quot;www.github.com/&lt;user&gt;/&lt;repo&gt;&quot;</span>,</span>
+<span id="cb11-8"><a href="#cb11-8" tabindex="-1"></a>    <span class="at">git_provider =</span> <span class="st">&quot;github&quot;</span>,</span>
+<span id="cb11-9"><a href="#cb11-9" tabindex="-1"></a>    <span class="at">reference =</span> <span class="st">&quot;main&quot;</span>,</span>
+<span id="cb11-10"><a href="#cb11-10" tabindex="-1"></a>    <span class="at">type =</span> <span class="st">&quot;branch&quot;</span></span>
+<span id="cb11-11"><a href="#cb11-11" tabindex="-1"></a>  ),</span>
+<span id="cb11-12"><a href="#cb11-12" tabindex="-1"></a>  <span class="co"># 9am every day, paused currently</span></span>
+<span id="cb11-13"><a href="#cb11-13" tabindex="-1"></a>  <span class="at">schedule =</span> <span class="fu">cron_schedule</span>(</span>
+<span id="cb11-14"><a href="#cb11-14" tabindex="-1"></a>    <span class="at">quartz_cron_expression =</span> <span class="st">&quot;0 0 9 * * ?&quot;</span>,</span>
+<span id="cb11-15"><a href="#cb11-15" tabindex="-1"></a>    <span class="at">pause_status =</span> <span class="st">&quot;PAUSED&quot;</span></span>
+<span id="cb11-16"><a href="#cb11-16" tabindex="-1"></a>  )</span>
+<span id="cb11-17"><a href="#cb11-17" tabindex="-1"></a>)</span></code></pre></div>
+<p>When specifying <code>git_source()</code> all
+<code>notebook_task()</code> must be repo paths - it’s not possible to
+have a mix of repo and workspace based notebooks. Additionally, this
+behaviour only works for <code>notebook_task()</code>, other tasks such
+as <code>spark_python_task()</code> are unsupported.</p>
+</div>
+</div>
+<div id="updating-jobs" class="section level2">
+<h2>Updating Jobs</h2>
+<div id="partial-update" class="section level3">
+<h3>Partial Update</h3>
+<p>Jobs can be partially updated, for example to rename an existing
+job:</p>
+<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a><span class="co"># only change the job name</span></span>
+<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a><span class="fu">db_jobs_update</span>(</span>
+<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a>  <span class="at">job_id =</span> multitask_job_with_reuse<span class="sc">$</span>job_id,</span>
+<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a>  <span class="at">name =</span> <span class="st">&quot;brickster example: renamed job&quot;</span></span>
+<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a>)</span></code></pre></div>
+<p>Adding a timeout and adjusting maximum concurrent runs allowed:</p>
+<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a><span class="co"># adding timeout and increasing max concurrent runs</span></span>
+<span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a><span class="fu">db_jobs_update</span>(</span>
+<span id="cb13-3"><a href="#cb13-3" tabindex="-1"></a>  <span class="at">job_id =</span> multitask_job_with_reuse<span class="sc">$</span>job_id,</span>
+<span id="cb13-4"><a href="#cb13-4" tabindex="-1"></a>  <span class="at">timeout_seconds =</span> <span class="dv">60</span> <span class="sc">*</span> <span class="dv">5</span>,</span>
+<span id="cb13-5"><a href="#cb13-5" tabindex="-1"></a>  <span class="at">max_concurrent_runs =</span> <span class="dv">2</span></span>
+<span id="cb13-6"><a href="#cb13-6" tabindex="-1"></a>)</span></code></pre></div>
+<p>You can add new tasks but it may involve some extra steps,
+either:</p>
+<ul>
+<li><p>Having <code>job_task()</code> required for job defined already
+within R and adding new tasks</p></li>
+<li><p>Specifying all <code>job_task()</code>’s again</p></li>
+<li><p>Using <code>db_jobs_get()</code> and parsing the returned
+metadata into <code>job_task()</code>’s</p></li>
+</ul>
+</div>
+<div id="complete-update" class="section level3">
+<h3>Complete Update</h3>
+<p>A complete overwrite of a job can be done with
+<code>db_jobs_reset()</code> - this allows the <code>job_id</code> to
+remain constant while maintaining the historical run information with
+prior settings. <code>db_jobs_reset()</code> is the same as
+<code>db_jobs_create()</code> except it takes one additional parameter
+(<code>job_id</code>).</p>
+</div>
+</div>
+<div id="managing-jobs" class="section level2">
+<h2>Managing Jobs</h2>
+<p><code>db_jobs_list()</code> and <code>db_jobs_runs_list()</code> were
+covered in <a href="#job-basics">job basics</a>.</p>
+<div id="invocation" class="section level3">
+<h3>Invocation</h3>
+<p>Jobs can be triggered by:</p>
+<ul>
+<li><p>Their defined schedule (see:
+<code>cron_schedule()</code>)</p></li>
+<li><p>Using <code>db_jobs_run_now()</code> to trigger a run outside
+regular schedule or on a paused job.</p></li>
+<li><p>Creating a one off job run via
+<code>db_jobs_runs_submit()</code></p></li>
+</ul>
+<p>The only example yet to be covered is <code>db_jobs_run_now()</code>,
+it accepts parameters as named lists:</p>
+<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a><span class="co"># invoke simple job example</span></span>
+<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a>triggered_run <span class="ot">&lt;-</span> <span class="fu">db_jobs_run_now</span>(<span class="at">job_id =</span> simple_task_job<span class="sc">$</span>job_id)</span></code></pre></div>
+<p>Runs can also be cancelled:</p>
+<div class="sourceCode" id="cb15"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a><span class="co"># cancel run whilst it is in progress</span></span>
+<span id="cb15-2"><a href="#cb15-2" tabindex="-1"></a><span class="fu">db_jobs_runs_cancel</span>(<span class="at">run_id =</span> triggered_run<span class="sc">$</span>run_id)</span></code></pre></div>
+</div>
+<div id="deletion" class="section level3">
+<h3>Deletion</h3>
+<p>Jobs and runs can be deleted with <code>db_jobs_delete()</code> and
+<code>db_jobs_runs_delete()</code> respectively.</p>
+<p>Cleaning up all jobs created in this documentation:</p>
+<div class="sourceCode" id="cb16"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a><span class="fu">db_jobs_delete</span>(<span class="at">job_id =</span> simple_task_job<span class="sc">$</span>job_id)</span>
+<span id="cb16-2"><a href="#cb16-2" tabindex="-1"></a><span class="fu">db_jobs_delete</span>(<span class="at">job_id =</span> multitask_job<span class="sc">$</span>job_id)</span>
+<span id="cb16-3"><a href="#cb16-3" tabindex="-1"></a><span class="fu">db_jobs_delete</span>(<span class="at">job_id =</span> multitask_job_with_reuse<span class="sc">$</span>job_id)</span></code></pre></div>
+</div>
+</div>
+</div>
+
+
+
+<!-- code folding -->
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+
+
+<title>Cluster Management</title>
+
+<script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
+// be compatible with the behavior of Pandoc < 2.8).
+document.addEventListener('DOMContentLoaded', function(e) {
+  var hs = document.querySelectorAll("div.section[class*='level'] > :first-child");
+  var i, h, a;
+  for (i = 0; i < hs.length; i++) {
+    h = hs[i];
+    if (!/^h[1-6]$/i.test(h.tagName)) continue;  // it should be a header h1-h6
+    a = h.attributes;
+    while (a.length > 0) h.removeAttribute(a[0].name);
+  }
+});
+</script>
+
+<style type="text/css">
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+span.underline{text-decoration: underline;}
+div.column{display: inline-block; vertical-align: top; width: 50%;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+</style>
+
+
+
+<style type="text/css">
+code {
+white-space: pre;
+}
+.sourceCode {
+overflow: visible;
+}
+</style>
+<style type="text/css" data-origin="pandoc">
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+color: #aaaaaa;
+}
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } 
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.at { color: #7d9029; } 
+code span.bn { color: #40a070; } 
+code span.bu { color: #008000; } 
+code span.cf { color: #007020; font-weight: bold; } 
+code span.ch { color: #4070a0; } 
+code span.cn { color: #880000; } 
+code span.co { color: #60a0b0; font-style: italic; } 
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.do { color: #ba2121; font-style: italic; } 
+code span.dt { color: #902000; } 
+code span.dv { color: #40a070; } 
+code span.er { color: #ff0000; font-weight: bold; } 
+code span.ex { } 
+code span.fl { color: #40a070; } 
+code span.fu { color: #06287e; } 
+code span.im { color: #008000; font-weight: bold; } 
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.kw { color: #007020; font-weight: bold; } 
+code span.op { color: #666666; } 
+code span.ot { color: #007020; } 
+code span.pp { color: #bc7a00; } 
+code span.sc { color: #4070a0; } 
+code span.ss { color: #bb6688; } 
+code span.st { color: #4070a0; } 
+code span.va { color: #19177c; } 
+code span.vs { color: #4070a0; } 
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+</style>
+<script>
+// apply pandoc div.sourceCode style to pre.sourceCode instead
+(function() {
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
+    try { var rules = sheets[i].cssRules; } catch (e) { continue; }
+    var j = 0;
+    while (j < rules.length) {
+      var rule = rules[j];
+      // check if there is a div.sourceCode rule
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
+      var style = rule.style.cssText;
+      // check if color or background-color is set
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
+      // replace div.sourceCode by a pre.sourceCode rule
+      sheets[i].deleteRule(j);
+      sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
+    }
+  }
+})();
+</script>
+
+
+
+
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+#TOC {
+clear: both;
+margin: 0 0 10px 10px;
+padding: 4px;
+width: 400px;
+border: 1px solid #CCCCCC;
+border-radius: 5px;
+background-color: #f6f6f6;
+font-size: 13px;
+line-height: 1.3;
+}
+#TOC .toctitle {
+font-weight: bold;
+font-size: 15px;
+margin-left: 5px;
+}
+#TOC ul {
+padding-left: 40px;
+margin-left: -1.5em;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+#TOC ul ul {
+margin-left: -2em;
+}
+#TOC li {
+line-height: 16px;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+
+code > span.kw { color: #555; font-weight: bold; } 
+code > span.dt { color: #902000; } 
+code > span.dv { color: #40a070; } 
+code > span.bn { color: #d14; } 
+code > span.fl { color: #d14; } 
+code > span.ch { color: #d14; } 
+code > span.st { color: #d14; } 
+code > span.co { color: #888888; font-style: italic; } 
+code > span.ot { color: #007020; } 
+code > span.al { color: #ff0000; font-weight: bold; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">Cluster Management</h1>
+
+
+
+<p><code>{brickster}</code> has 1:1 mappings with the clusters REST API,
+enabling full control of Databricks clusters from your R session.</p>
+<div id="cluster-creation" class="section level2">
+<h2>Cluster Creation</h2>
+<p>Clusters have a number of parameters and can be configured to match
+to needs of a given workload. <code>db_cluster_create()</code>
+facilitates creation of a cluster in a Databricks workspace for all
+cloud platforms (AWS, Azure, GCP).</p>
+<p>Depending on the cloud you will need to change the node types and
+<code>cloud_attrs</code> to be one of; <code>aws_attributes()</code>,
+<code>azure_attributes()</code>, or <code>gcp_attributes()</code>.</p>
+<p>Below we will create a cluster on AWS and then step through using the
+other supporting functions.</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">library</span>(brickster)</span>
+<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a></span>
+<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a><span class="co"># create a small cluster on AWS with DBR 9.1 LTS</span></span>
+<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a>new_cluster <span class="ot">&lt;-</span> <span class="fu">db_cluster_create</span>(</span>
+<span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a>  <span class="at">name =</span> <span class="st">&quot;brickster-cluster&quot;</span>,</span>
+<span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a>  <span class="at">spark_version =</span> <span class="st">&quot;9.1.x-scala2.12&quot;</span>,</span>
+<span id="cb1-7"><a href="#cb1-7" tabindex="-1"></a>  <span class="at">num_workers =</span> <span class="dv">2</span>,</span>
+<span id="cb1-8"><a href="#cb1-8" tabindex="-1"></a>  <span class="at">node_type_id =</span> <span class="st">&quot;m5a.xlarge&quot;</span>,</span>
+<span id="cb1-9"><a href="#cb1-9" tabindex="-1"></a>  <span class="at">cloud_attrs =</span> <span class="fu">aws_attributes</span>(</span>
+<span id="cb1-10"><a href="#cb1-10" tabindex="-1"></a>    <span class="at">ebs_volume_count =</span> <span class="dv">3</span>,</span>
+<span id="cb1-11"><a href="#cb1-11" tabindex="-1"></a>    <span class="at">ebs_volume_size =</span> <span class="dv">100</span></span>
+<span id="cb1-12"><a href="#cb1-12" tabindex="-1"></a>  )</span>
+<span id="cb1-13"><a href="#cb1-13" tabindex="-1"></a>)</span></code></pre></div>
+<p>Refer to documentation for details on how to use other parameters not
+mentioned here (e.g. <code>spark_conf</code>).</p>
+<p>Before creating a cluster you may want to check the supported values
+for a number of the parameters. There are functions to assist with
+this:</p>
+<table>
+<colgroup>
+<col width="23%" />
+<col width="76%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="right">Function</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="right"><code>db_cluster_runtime_versions()</code></td>
+<td>List of runtime versions available for the workspace, useful for
+finding relevant <code>spark_version</code></td>
+</tr>
+<tr class="even">
+<td align="right"><code>db_cluster_list_node_types()</code></td>
+<td>List of supported node types available in workspace/region, useful
+for finding relevant
+<code>node_type_id</code>/<code>driver_node_type_id</code></td>
+</tr>
+<tr class="odd">
+<td align="right"><code>db_cluster_list_zones()</code></td>
+<td>AWS Only, lists availability zones (AZ) clusters can occupy</td>
+</tr>
+</tbody>
+</table>
+<p><code>db_cluster_get()</code> will provide details for the cluster we
+just created, including information such as the state.</p>
+<p>This can be useful as you may wish to wait for the cluster to be
+<code>RUNNING</code> , which is exactly what
+<code>get_and_start_cluster()</code> uses internally to wait until the
+cluster is running before completing.</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a>cluster_info <span class="ot">&lt;-</span> <span class="fu">db_cluster_get</span>(<span class="at">cluster_id =</span> new_cluster<span class="sc">$</span>cluster_id)</span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a>cluster_info<span class="sc">$</span>state</span></code></pre></div>
+</div>
+<div id="editing-clusters" class="section level2">
+<h2>Editing Clusters</h2>
+<p>You can edit Databricks clusters to change various parameters using
+<code>db_cluster_edit()</code>. For example, we may decide we want our
+cluster to autoscale between 2-8 nodes and add some tags.</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a></span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a><span class="co"># we are required to input all parameters</span></span>
+<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a><span class="fu">db_cluster_edit</span>(</span>
+<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>  <span class="at">cluster_id =</span> new_cluster<span class="sc">$</span>cluster_id,</span>
+<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a>  <span class="at">name =</span> <span class="st">&quot;brickster-cluster&quot;</span>,</span>
+<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a>  <span class="at">spark_version =</span> <span class="st">&quot;9.1.x-scala2.12&quot;</span>,</span>
+<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a>  <span class="at">node_type_id =</span> <span class="st">&quot;m5a.xlarge&quot;</span>,</span>
+<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a>  <span class="at">autoscale =</span> <span class="fu">cluster_autoscale</span>(<span class="at">min_workers =</span> <span class="dv">2</span>, <span class="at">max_workers =</span> <span class="dv">8</span>),</span>
+<span id="cb3-9"><a href="#cb3-9" tabindex="-1"></a>  <span class="at">cloud_attrs =</span> <span class="fu">aws_attributes</span>(</span>
+<span id="cb3-10"><a href="#cb3-10" tabindex="-1"></a>    <span class="at">ebs_volume_count =</span> <span class="dv">3</span>,</span>
+<span id="cb3-11"><a href="#cb3-11" tabindex="-1"></a>    <span class="at">ebs_volume_size =</span> <span class="dv">100</span></span>
+<span id="cb3-12"><a href="#cb3-12" tabindex="-1"></a>  ),</span>
+<span id="cb3-13"><a href="#cb3-13" tabindex="-1"></a>  <span class="at">custom_tags =</span> <span class="fu">list</span>(</span>
+<span id="cb3-14"><a href="#cb3-14" tabindex="-1"></a>    <span class="at">purpose =</span> <span class="st">&quot;brickster_cluster_demo&quot;</span></span>
+<span id="cb3-15"><a href="#cb3-15" tabindex="-1"></a>  )</span>
+<span id="cb3-16"><a href="#cb3-16" tabindex="-1"></a>)</span></code></pre></div>
+<p>However, if the intention was to only change the size of a given
+cluster the <code>db_cluster_resize()</code> function is a simpler
+alternative.</p>
+<p>I can either adjust the number of workers or change the autoscale
+range. If the range or workers is adjusted via <code>autoscale</code>
+the number of workers active on the cluster will be increased/decreased
+if they are outside the bounds.</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="co"># adjust number autoscale range to be between 4-6 workers</span></span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a><span class="fu">db_cluster_resize</span>(</span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a>  <span class="at">cluster_id =</span> new_cluster<span class="sc">$</span>cluster_id,</span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>  <span class="at">autoscale =</span> <span class="fu">cluster_autoscale</span>(<span class="at">min_workers =</span> <span class="dv">4</span>, <span class="at">max_workers =</span> <span class="dv">6</span>)</span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>)</span></code></pre></div>
+<p>It’s important to note that if specifying <code>num_workers</code>
+instead of <code>autoscale</code> on a cluster than has an existing
+autoscale range it will become a fixed number of workers from that point
+onward.</p>
+<p>Databricks clusters can be “pinned” which stops them from being
+removed after 30 days of termination. <code>db_cluster_pin()</code> and
+<code>db_cluster_unpin()</code> are the functions used for changing if a
+cluster is “pinned” or not.</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="co"># pin the cluster</span></span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a><span class="fu">db_cluster_pin</span>(<span class="at">cluster_id =</span> new_cluster<span class="sc">$</span>cluster_id)</span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a></span>
+<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a><span class="co"># unpin the cluster</span></span>
+<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a><span class="co"># db_cluster_unpin(cluster_id = new_cluster$cluster_id)</span></span></code></pre></div>
+</div>
+<div id="cluster-state" class="section level2">
+<h2>Cluster State</h2>
+<p>There are a few functions that can be used to to manage the state of
+an existing cluster</p>
+<table>
+<colgroup>
+<col width="25%" />
+<col width="75%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="right">Function</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="right"><code>db_cluster_start()</code></td>
+<td>Start a cluster that is inactive</td>
+</tr>
+<tr class="even">
+<td align="right"><code>db_cluster_restart()</code></td>
+<td>Restart a cluster, cluster must already be running</td>
+</tr>
+<tr class="odd">
+<td align="right"><code>db_cluster_delete()</code>
+/<code>db_cluster_terminate()</code></td>
+<td>Terminate an active cluster, does not remove the cluster
+configuration from Databricks</td>
+</tr>
+<tr class="even">
+<td align="right"><code>db_cluster_perm_delete()</code></td>
+<td>Stops (if active) and permanently deletes a cluster, it will not
+longer appear in Databricks</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div id="cluster-libraries" class="section level2">
+<h2>Cluster Libraries</h2>
+<p>Databricks clusters can have libraries installed from a number of
+sources using <code>db_libs_install()</code> and the associated
+<code>libs_*()</code> functions:</p>
+<table>
+<thead>
+<tr class="header">
+<th align="right">Function</th>
+<th>Library Source</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="right"><code>lib_cran()</code></td>
+<td>CRAN</td>
+</tr>
+<tr class="even">
+<td align="right"><code>lib_pypi()</code></td>
+<td>PyPi</td>
+</tr>
+<tr class="odd">
+<td align="right"><code>lib_egg()</code></td>
+<td>Python egg (file)</td>
+</tr>
+<tr class="even">
+<td align="right"><code>lib_whl()</code></td>
+<td>Python wheel (file)</td>
+</tr>
+<tr class="odd">
+<td align="right"><code>lib_maven()</code></td>
+<td>Maven</td>
+</tr>
+<tr class="even">
+<td align="right"><code>lib_jar()</code></td>
+<td>JAR (file)</td>
+</tr>
+</tbody>
+</table>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="co"># installing a package from CRAN on cluster</span></span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a><span class="fu">db_libs_install</span>(</span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>  <span class="at">cluster_id =</span> new_cluster<span class="sc">$</span>cluster_id,</span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>  <span class="at">libraries =</span> <span class="fu">libraries</span>(</span>
+<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>    <span class="fu">lib_cran</span>(<span class="at">package =</span> <span class="st">&quot;palmerpenguins&quot;</span>),</span>
+<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a>    <span class="fu">lib_cran</span>(<span class="at">package =</span> <span class="st">&quot;dplyr&quot;</span>)</span>
+<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a>  )</span>
+<span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a>)</span></code></pre></div>
+<p>For convenience the <code>wait_for_lib_installs()</code> function
+will block until all the libraries for the specified cluster have
+finished installing.</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a><span class="fu">wait_for_lib_installs</span>(<span class="at">cluster_id =</span> new_cluster<span class="sc">$</span>cluster_id)</span></code></pre></div>
+<p>Installation of libraries is asynchronous and will complete in the
+background. <code>db_libs_cluster_status()</code> is used to check on
+the installation status of libraries for a given cluster,
+<code>db_libs_all_cluster_statuses()</code> is used for getting the
+status of all libraries across all clusters in the workspace.</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="fu">db_libs_cluster_status</span>(<span class="at">cluster_id =</span> new_cluster<span class="sc">$</span>cluster_id)</span></code></pre></div>
+<p>Libraries can be uninstalled using
+<code>db_libs_uninstall()</code>.</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a><span class="fu">db_libs_uninstall</span>(</span>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a>  <span class="at">cluster_id =</span> new_cluster<span class="sc">$</span>cluster_id,</span>
+<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a>  <span class="at">libraries =</span> <span class="fu">libraries</span>(</span>
+<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a>    <span class="fu">lib_cran</span>(<span class="at">package =</span> <span class="st">&quot;palmerpenguins&quot;</span>)</span>
+<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a>  )</span>
+<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a>)</span></code></pre></div>
+<p>Using <code>db_libs_cluster_status()</code> shows that the library
+will be uninstalled upon restart
+(e.g. <code>db_cluster_restart()</code>).</p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a><span class="fu">db_libs_cluster_status</span>(<span class="at">cluster_id =</span> new_cluster<span class="sc">$</span>cluster_id)</span></code></pre></div>
+</div>
+<div id="events" class="section level2">
+<h2>Events</h2>
+<p>A list of events regarding the clusters activity can be fetched via
+<code>db_cluster_events()</code>. There are many <a href="https://docs.databricks.com/dev-tools/api/latest/clusters.html#clustereventtype">event
+types</a> that can occur, and by default the 50 most recent events are
+returned.</p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a>events <span class="ot">&lt;-</span> <span class="fu">db_cluster_events</span>(<span class="at">cluster_id =</span> new_cluster<span class="sc">$</span>cluster_id)</span>
+<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a><span class="fu">head</span>(events, <span class="dv">1</span>)</span></code></pre></div>
+</div>
+
+
+
+<!-- code folding -->
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>
