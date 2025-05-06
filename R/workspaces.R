@@ -1,5 +1,3 @@
-# https://docs.databricks.com/dev-tools/api/latest/workspace.html
-
 #' Delete Object/Directory (Workspaces)
 #'
 #' @param path Absolute path of the notebook or directory.
@@ -20,9 +18,13 @@
 #' @family Workspace API
 #'
 #' @export
-db_workspace_delete <- function(path, recursive = FALSE,
-                                host = db_host(), token = db_token(),
-                                perform_request = TRUE) {
+db_workspace_delete <- function(
+  path,
+  recursive = FALSE,
+  host = db_host(),
+  token = db_token(),
+  perform_request = TRUE
+) {
   body <- list(
     path = path,
     recursive = recursive
@@ -42,13 +44,15 @@ db_workspace_delete <- function(path, recursive = FALSE,
   } else {
     req
   }
-
 }
 
 #' Export Notebook or Directory (Workspaces)
 #'
 #' @param format One of `AUTO`, `SOURCE`, `HTML`, `JUPYTER`, `DBC`, `R_MARKDOWN`.
 #' Default is `SOURCE`.
+#' @param output_path Path to export file to, ensure to include correct suffix.
+#' @param direct_download Boolean (default: `FALSE`), if `TRUE` download file
+#' contents directly to file. Must also specify `output_path`.
 #' @inheritParams auth_params
 #' @inheritParams db_workspace_delete
 #' @inheritParams db_sql_warehouse_create
@@ -64,24 +68,27 @@ db_workspace_delete <- function(path, recursive = FALSE,
 #' At this time we do not support the `direct_download` parameter and returns a
 #' base64 encoded string.
 #'
-#' [See More](https://docs.databricks.com/dev-tools/api/latest/workspace.html#export).
+#' [See More](https://docs.databricks.com/api/workspace/workspace/export).
 #'
 #' @family Workspace API
 #'
 #' @return base64 encoded string
 #' @export
-db_workspace_export <- function(path,
-                                format = c("AUTO", "SOURCE", "HTML", "JUPYTER", "DBC", "R_MARKDOWN"),
-                                host = db_host(), token = db_token(),
-                                perform_request = TRUE) {
-
-  # TODO
-  # do not support direct_download being TRUE currently
-  # need to make a decision as to if we expect to support saving direct to file
-  # gut feel is yes but want to think about it a bit more
-  direct_download <- FALSE
-
+db_workspace_export <- function(
+  path,
+  format = c("AUTO", "SOURCE", "HTML", "JUPYTER", "DBC", "R_MARKDOWN"),
+  host = db_host(),
+  token = db_token(),
+  output_path = NULL,
+  direct_download = FALSE,
+  perform_request = TRUE
+) {
   format <- match.arg(format, several.ok = FALSE)
+  stopifnot(is.logical(direct_download))
+
+  if (direct_download) {
+    stopifnot(!is.null(output_path))
+  }
 
   body <- list(
     path = path,
@@ -99,11 +106,17 @@ db_workspace_export <- function(path,
   )
 
   if (perform_request) {
-    db_perform_request(req)
+    if (direct_download) {
+      req |>
+        httr2::req_perform() |>
+        httr2::resp_body_raw() |>
+        base::writeBin(con = output_path)
+    } else {
+      db_perform_request(req)
+    }
   } else {
     req
   }
-
 }
 
 #' Get Object Status (Workspaces)
@@ -120,9 +133,12 @@ db_workspace_export <- function(path,
 #' @family Workspace API
 #'
 #' @export
-db_workspace_get_status <- function(path,
-                                    host = db_host(), token = db_token(),
-                                    perform_request = TRUE) {
+db_workspace_get_status <- function(
+  path,
+  host = db_host(),
+  token = db_token(),
+  perform_request = TRUE
+) {
   body <- list(
     path = path
   )
@@ -141,7 +157,6 @@ db_workspace_get_status <- function(path,
   } else {
     req
   }
-
 }
 
 #' Import Notebook/Directory (Workspaces)
@@ -171,14 +186,17 @@ db_workspace_get_status <- function(path,
 #' @family Workspace API
 #'
 #' @export
-db_workspace_import <- function(path,
-                                file = NULL,
-                                content = NULL,
-                                format = c("AUTO", "SOURCE", "HTML", "JUPYTER", "DBC", "R_MARKDOWN"),
-                                language = NULL,
-                                overwrite = FALSE,
-                                host = db_host(), token = db_token(),
-                                perform_request = TRUE) {
+db_workspace_import <- function(
+  path,
+  file = NULL,
+  content = NULL,
+  format = c("AUTO", "SOURCE", "HTML", "JUPYTER", "DBC", "R_MARKDOWN"),
+  language = NULL,
+  overwrite = FALSE,
+  host = db_host(),
+  token = db_token(),
+  perform_request = TRUE
+) {
   format <- match.arg(format, several.ok = FALSE)
 
   if (!is.null(language)) {
@@ -220,7 +238,6 @@ db_workspace_import <- function(path,
   } else {
     req
   }
-
 }
 
 #' List Directory Contents (Workspaces)
@@ -237,8 +254,12 @@ db_workspace_import <- function(path,
 #' @family Workspace API
 #'
 #' @export
-db_workspace_list <- function(path, host = db_host(), token = db_token(),
-                              perform_request = TRUE) {
+db_workspace_list <- function(
+  path,
+  host = db_host(),
+  token = db_token(),
+  perform_request = TRUE
+) {
   body <- list(
     path = path
   )
@@ -257,7 +278,6 @@ db_workspace_list <- function(path, host = db_host(), token = db_token(),
   } else {
     req
   }
-
 }
 
 #' Make a Directory (Workspaces)
@@ -276,9 +296,12 @@ db_workspace_list <- function(path, host = db_host(), token = db_token(),
 #' @family Workspace API
 #'
 #' @export
-db_workspace_mkdirs <- function(path,
-                                host = db_host(), token = db_token(),
-                                perform_request = TRUE) {
+db_workspace_mkdirs <- function(
+  path,
+  host = db_host(),
+  token = db_token(),
+  perform_request = TRUE
+) {
   body <- list(
     path = path
   )
@@ -298,5 +321,4 @@ db_workspace_mkdirs <- function(path,
   } else {
     req
   }
-
 }

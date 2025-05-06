@@ -567,7 +567,7 @@ will be uninstalled upon restart
 <div id="events" class="section level2">
 <h2>Events</h2>
 <p>A list of events regarding the clusters activity can be fetched via
-<code>db_cluster_events()</code>. There are many <a href="https://docs.databricks.com/dev-tools/api/latest/clusters.html#clustereventtype">event
+<code>db_cluster_events()</code>. There are many <a href="https://docs.databricks.com/api/workspace/clusters/events#events">event
 types</a> that can occur, and by default the 50 most recent events are
 returned.</p>
 <div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a>events <span class="ot">&lt;-</span> <span class="fu">db_cluster_events</span>(<span class="at">cluster_id =</span> new_cluster<span class="sc">$</span>cluster_id)</span>
