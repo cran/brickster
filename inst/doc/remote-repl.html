@@ -347,9 +347,9 @@ Databricks, below is an overview of the available of those in the
 package:</p>
 <table style="width:100%;">
 <colgroup>
-<col width="52%" />
-<col width="10%" />
-<col width="36%" />
+<col width="51%" />
+<col width="11%" />
+<col width="37%" />
 </colgroup>
 <thead>
 <tr class="header">
@@ -360,13 +360,18 @@ package:</p>
 </thead>
 <tbody>
 <tr class="odd">
+<td><code>db_sql_query</code></td>
+<td>SQL Warehouse</td>
+<td>Simple and efficient function to run SQL</td>
+</tr>
+<tr class="even">
 <td><a href="https://docs.databricks.com/api/workspace/statementexecution">SQL
 execution API</a><br />
 (<a href="https://databrickslabs.github.io/brickster/reference/index.html#sql-statement-execution"><code>db_sql_exec_*</code></a>)</td>
 <td>SQL Warehouse</td>
 <td>Lower level functions that align 1:1 with API endpoints</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>Command execution context manager<br />
 (<code>db_context_manager</code>)</td>
 <td>Clusters<br />
@@ -374,20 +379,13 @@ execution API</a><br />
 <td>Higher level <code>R6</code> class for command execution
 contexts.</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><a href="https://docs.databricks.com/api/workspace/commandexecution">Command
 execution API</a><br />
 (<a href="https://databrickslabs.github.io/brickster/reference/index.html#execution-contexts"><code>db_context_*</code></a>)</td>
 <td>Clusters<br />
 (Shared, Single User)</td>
 <td>Lower level functions that align 1:1 with API endpoints</td>
-</tr>
-<tr class="even">
-<td><a href="https://docs.databricks.com/en/dev-tools/python-sql-connector.html">Databricks
-SQL Connector</a> via <code>{reticulate}</code><br />
-(<a href="https://databrickslabs.github.io/brickster/reference/index.html#sql-connector"><code>db_sql_client</code></a>)</td>
-<td>SQL Warehouse</td>
-<td>Exposes <code>databricks.sql</code> connector to R.</td>
 </tr>
 <tr class="odd">
 <td>Databricks REPL<br />
@@ -424,11 +422,7 @@ against the remote compute from the local session.</p>
 <p>The REPL has a shortcut you can enter <code>:&lt;language&gt;</code>
 to change the active language. You can change between the following
 languages:</p>
-<table style="width:97%;">
-<colgroup>
-<col width="47%" />
-<col width="50%" />
-</colgroup>
+<table>
 <thead>
 <tr class="header">
 <th>Language</th>
@@ -461,22 +455,6 @@ languages:</p>
 <p>When you change between languages all variables should persist unless
 REPL is exited.</p>
 </div>
-<div id="rstudio-addins" class="section level2">
-<h2>RStudio Addins</h2>
-<p>There are three addins included with <code>{brickster}</code> for use
-with the REPL:</p>
-<ol style="list-style-type: decimal">
-<li><p>Send selection to console</p></li>
-<li><p>Send current document to console</p></li>
-<li><p>Send R script to console</p></li>
-</ol>
-<p>It’s recommended that (1) and (2) be bound to a keyboard shortcut if
-using the REPL frequently (‘Tools’ &gt; ‘Modify Keyboard Shortcuts…’
-&gt; ‘Search for <code>brickster</code>’).</p>
-<p>These addins behave slightly different to the standard shortcuts as
-they ensure that commands that span multiple lines are handled correctly
-via the REPL.</p>
-</div>
 <div id="limitations" class="section level2">
 <h2>Limitations</h2>
 <ul>
@@ -487,6 +465,8 @@ variables from the remote contexts in the environment pane</p></li>
 limitations that require a workaround</a> currently</p></li>
 <li><p>Not designed to work with interactive serverless compute</p></li>
 <li><p>Cannot persist or recover sessions</p></li>
+<li><p>Multi-line expressions are only supported for R. Python, Scala,
+and SQL are limited to single line expressions.</p></li>
 </ul>
 </div>
 </div>

@@ -342,9 +342,8 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 
 <div id="managing-databricks-jobs" class="section level1">
 <h1>Managing Databricks Jobs</h1>
-<p><code>{brickster}</code> provides full coverage of the Jobs REST
-API’s (specifically version 2.1), allowing creation of multi-task jobs
-via R code.</p>
+<p><code>{brickster}</code> provides coverage of the Jobs REST API’s,
+allowing creation of multi-task jobs via R code.</p>
 <div id="job-basics" class="section level2">
 <h2>Job Basics</h2>
 <p>When listing the jobs the default behaviour is to returns the first
@@ -441,7 +440,7 @@ paused schedule:</p>
 <span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>  <span class="at">description =</span> <span class="st">&quot;a simple task that runs a notebook&quot;</span>,</span>
 <span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a>  <span class="co"># specify a cluster for the job</span></span>
 <span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a>  <span class="at">new_cluster =</span> <span class="fu">new_cluster</span>(</span>
-<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a>    <span class="at">spark_version =</span> <span class="st">&quot;9.1.x-scala2.12&quot;</span>,</span>
+<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a>    <span class="at">spark_version =</span> <span class="st">&quot;16.4.x-scala2.12&quot;</span>,</span>
 <span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a>    <span class="at">driver_node_type_id =</span> <span class="st">&quot;m5a.large&quot;</span>,</span>
 <span id="cb3-9"><a href="#cb3-9" tabindex="-1"></a>    <span class="at">node_type_id =</span> <span class="st">&quot;m5a.large&quot;</span>,</span>
 <span id="cb3-10"><a href="#cb3-10" tabindex="-1"></a>    <span class="at">num_workers =</span> <span class="dv">2</span>,</span>
@@ -471,7 +470,7 @@ each task also will define its own <code>new_cluster</code>.</p>
 example it demonstrates how to build dependencies.</p>
 <div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="co"># one cluster definition, repeatedly use for each task</span></span>
 <span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a>multitask_cluster <span class="ot">&lt;-</span> <span class="fu">new_cluster</span>(</span>
-<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a>  <span class="at">spark_version =</span> <span class="st">&quot;9.1.x-scala2.12&quot;</span>,</span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a>  <span class="at">spark_version =</span> <span class="st">&quot;16.4.x-scala2.12&quot;</span>,</span>
 <span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a>  <span class="at">driver_node_type_id =</span> <span class="st">&quot;m5a.large&quot;</span>,</span>
 <span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a>  <span class="at">node_type_id =</span> <span class="st">&quot;m5a.large&quot;</span>,</span>
 <span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a>  <span class="at">num_workers =</span> <span class="dv">2</span>,</span>
@@ -605,7 +604,7 @@ contains <code>simple-notebook.py</code>.</p>
 <span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a>  <span class="at">description =</span> <span class="st">&quot;a simple task that runs a notebook&quot;</span>,</span>
 <span id="cb10-7"><a href="#cb10-7" tabindex="-1"></a>  <span class="co"># specify a cluster for the job</span></span>
 <span id="cb10-8"><a href="#cb10-8" tabindex="-1"></a>  <span class="at">new_cluster =</span> <span class="fu">new_cluster</span>(</span>
-<span id="cb10-9"><a href="#cb10-9" tabindex="-1"></a>    <span class="at">spark_version =</span> <span class="st">&quot;9.1.x-scala2.12&quot;</span>,</span>
+<span id="cb10-9"><a href="#cb10-9" tabindex="-1"></a>    <span class="at">spark_version =</span> <span class="st">&quot;16.4.x-scala2.12&quot;</span>,</span>
 <span id="cb10-10"><a href="#cb10-10" tabindex="-1"></a>    <span class="at">driver_node_type_id =</span> <span class="st">&quot;m5a.large&quot;</span>,</span>
 <span id="cb10-11"><a href="#cb10-11" tabindex="-1"></a>    <span class="at">node_type_id =</span> <span class="st">&quot;m5a.large&quot;</span>,</span>
 <span id="cb10-12"><a href="#cb10-12" tabindex="-1"></a>    <span class="at">num_workers =</span> <span class="dv">2</span>,</span>
@@ -634,11 +633,6 @@ notebook.</p>
 <span id="cb11-15"><a href="#cb11-15" tabindex="-1"></a>    <span class="at">pause_status =</span> <span class="st">&quot;PAUSED&quot;</span></span>
 <span id="cb11-16"><a href="#cb11-16" tabindex="-1"></a>  )</span>
 <span id="cb11-17"><a href="#cb11-17" tabindex="-1"></a>)</span></code></pre></div>
-<p>When specifying <code>git_source()</code> all
-<code>notebook_task()</code> must be repo paths - it’s not possible to
-have a mix of repo and workspace based notebooks. Additionally, this
-behaviour only works for <code>notebook_task()</code>, other tasks such
-as <code>spark_python_task()</code> are unsupported.</p>
 </div>
 </div>
 <div id="updating-jobs" class="section level2">

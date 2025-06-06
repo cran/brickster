@@ -49,7 +49,7 @@ library(brickster)
 #    description = "a simple task that runs a notebook",
 #    # specify a cluster for the job
 #    new_cluster = new_cluster(
-#      spark_version = "9.1.x-scala2.12",
+#      spark_version = "16.4.x-scala2.12",
 #      driver_node_type_id = "m5a.large",
 #      node_type_id = "m5a.large",
 #      num_workers = 2,
@@ -74,7 +74,7 @@ library(brickster)
 ## -----------------------------------------------------------------------------
 #  # one cluster definition, repeatedly use for each task
 #  multitask_cluster <- new_cluster(
-#    spark_version = "9.1.x-scala2.12",
+#    spark_version = "16.4.x-scala2.12",
 #    driver_node_type_id = "m5a.large",
 #    node_type_id = "m5a.large",
 #    num_workers = 2,
@@ -180,7 +180,7 @@ library(brickster)
 #    description = "a simple task that runs a notebook",
 #    # specify a cluster for the job
 #    new_cluster = new_cluster(
-#      spark_version = "9.1.x-scala2.12",
+#      spark_version = "16.4.x-scala2.12",
 #      driver_node_type_id = "m5a.large",
 #      node_type_id = "m5a.large",
 #      num_workers = 2,

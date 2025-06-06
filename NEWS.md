@@ -1,3 +1,14 @@
+# brickster 0.2.8
+
+* Added SQL Queries API coverage
+* Updated Jobs to 2.2
+* Added additional tasks for jobs: `for_each_task`, `condition_task`, `sql_query_task`, `sql_file_task`, `run_job_task`
+* Removing the Python SQL connector as `db_sql_query` supersedes it.
+* Added `db_sql_query` to simplify execution of SQL
+* Adjusted `db_repl` to handle mulit-line expressions (R only)
+* Removed RStudio Addins to send lines/selection/files to console
+* Moved arrow to Suggests
+
 # brickster 0.2.7
 
 * Exporting UC table functions (`db_uc_table*`) (#72)
