@@ -7,6 +7,6 @@ knitr::opts_chunk$set(
 library(brickster)
 
 ## -----------------------------------------------------------------------------
-#  # start REPL
-#  db_repl(cluster_id = "<insert cluster id>")
+# # start REPL
+# db_repl(cluster_id = "<insert cluster id>")
 
