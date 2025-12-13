@@ -139,6 +139,34 @@ test_that("Quote handling utility functions work", {
   expect_equal(clean_quoted('"samples.nyctaxi.trips"'), "samples.nyctaxi.trips")
 })
 
+test_that("db_generate_typed_values_sql preserves single quotes", {
+  con <- new(
+    "DatabricksConnection",
+    warehouse_id = "test_warehouse",
+    host = "test_host",
+    token = "test_token",
+    catalog = "",
+    schema = "",
+    staging_volume = ""
+  )
+
+  test_value <- "O'Connor & D'Angelo's data"
+
+  values_sql <- brickster:::db_generate_typed_values_sql(
+    con,
+    data.frame(test = test_value, stringsAsFactors = FALSE)
+  )
+
+  expect_equal(values_sql, "('O\\'Connor & D\\'Angelo\\'s data')")
+
+  view_values_sql <- brickster:::db_generate_typed_values_sql_for_view(
+    con,
+    data.frame(test = test_value, stringsAsFactors = FALSE)
+  )
+
+  expect_equal(view_values_sql, "('O\\'Connor & D\\'Angelo\\'s data')")
+})
+
 test_that("DatabricksResult show method works", {
   # Create a result object for testing
   res <- new(
@@ -567,14 +595,14 @@ test_that("Volume method selection logic works correctly", {
   expect_false(db_should_use_volume_method(small_data, NULL))
   expect_false(db_should_use_volume_method(medium_data, NULL))
 
-  # Test with volume but small data (should return FALSE)
-  expect_false(db_should_use_volume_method(
+  # Test with volume but small data (should return TRUE)
+  expect_true(db_should_use_volume_method(
     small_data,
     "/Volumes/test/test/test"
   ))
 
-  # Test with volume but medium data (should return FALSE as threshold is > 20000)
-  expect_false(db_should_use_volume_method(
+  # Test with volume but medium data (should return TRUE)
+  expect_true(db_should_use_volume_method(
     medium_data,
     "/Volumes/test/test/test"
   ))
@@ -586,11 +614,54 @@ test_that("Volume method selection logic works correctly", {
     temporary = TRUE
   ))
 
-  # Test large data with volume (should depend on arrow availability)
-  skip_if(!rlang::is_installed("arrow"), "arrow package not available")
+  # Test large data with volume (should use volume method)
   expect_true(db_should_use_volume_method(
     large_data,
     "/Volumes/test/test/test"
+  ))
+})
+
+test_that("db_write_table_volume enforces arrow availability", {
+  con <- new(
+    "DatabricksConnection",
+    warehouse_id = "test_warehouse",
+    host = "test_host",
+    token = "test_token",
+    catalog = "",
+    schema = "",
+    staging_volume = ""
+  )
+
+  quoted_name <- dbQuoteIdentifier(con, "test_table")
+  medium_data <- data.frame(x = seq_len(30000), y = "a")
+  large_data <- data.frame(x = seq_len(60000), y = "a")
+
+  expect_no_warning(expect_error(
+    with_mocked_bindings(
+      db_write_table_volume(
+        con,
+        quoted_name,
+        medium_data,
+        "/Volumes/test/test/test"
+      ),
+      is_installed = function(...) FALSE,
+      .package = "rlang"
+    ),
+    "Volume-based writes require"
+  ))
+
+  expect_no_warning(expect_error(
+    with_mocked_bindings(
+      db_write_table_volume(
+        con,
+        quoted_name,
+        large_data,
+        "/Volumes/test/test/test"
+      ),
+      is_installed = function(...) FALSE,
+      .package = "rlang"
+    ),
+    "Volume-based writes require"
   ))
 })
 

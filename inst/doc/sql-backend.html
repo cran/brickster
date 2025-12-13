@@ -456,7 +456,7 @@ to be specified when establishing the connection, or directly to
 <p>Ensure that <code>staging_volume</code> is a valid Volume path and
 you have permission to write files.</p>
 <div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="co"># small data (150 rows)</span></span>
-<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a><span class="co"># generates an in-line CTAS</span></span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a><span class="co"># creates the table schema explicitly then inserts rows inline</span></span>
 <span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a><span class="fu">dbWriteTable</span>(</span>
 <span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>  <span class="at">conn =</span> con,</span>
 <span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>  <span class="at">name =</span> <span class="fu">Id</span>(<span class="at">catalog =</span> <span class="st">&quot;&lt;catalog&gt;&quot;</span>, <span class="at">schema =</span> <span class="st">&quot;&lt;schema&gt;&quot;</span>, <span class="at">table =</span> <span class="st">&quot;&lt;table&gt;&quot;</span>),</span>
@@ -473,7 +473,7 @@ you have permission to write files.</p>
 <span id="cb4-16"><a href="#cb4-16" tabindex="-1"></a>  <span class="at">name =</span> <span class="fu">Id</span>(<span class="at">catalog =</span> <span class="st">&quot;&lt;catalog&gt;&quot;</span>, <span class="at">schema =</span> <span class="st">&quot;&lt;schema&gt;&quot;</span>, <span class="at">table =</span> <span class="st">&quot;&lt;table&gt;&quot;</span>),</span>
 <span id="cb4-17"><a href="#cb4-17" tabindex="-1"></a>  <span class="at">value =</span> iris_big,</span>
 <span id="cb4-18"><a href="#cb4-18" tabindex="-1"></a>  <span class="at">overwrite =</span> <span class="cn">TRUE</span>,</span>
-<span id="cb4-19"><a href="#cb4-19" tabindex="-1"></a>  <span class="at">staging_volume =</span> <span class="st">&quot;/Volumes/&lt;catalog&gt;/&lt;schema&gt;/&lt;volume&gt;/...&quot;</span> <span class="co"># or inherited from connection</span></span>
+<span id="cb4-19"><a href="#cb4-19" tabindex="-1"></a>  <span class="at">staging_volume =</span> <span class="st">&quot;/Volumes/&lt;catalog&gt;/&lt;schema&gt;/&lt;volume&gt;/...&quot;</span>, <span class="co"># or inherited from connection</span></span>
 <span id="cb4-20"><a href="#cb4-20" tabindex="-1"></a>  <span class="at">progress =</span> <span class="cn">TRUE</span></span>
 <span id="cb4-21"><a href="#cb4-21" tabindex="-1"></a>)</span></code></pre></div>
 </div>
@@ -533,7 +533,13 @@ locally.</p>
 makes functions like <code>copy_to</code> only usable when specifying
 <code>temporary</code> as <code>FALSE</code> which will use
 <code>dbWriteTable</code> to create a table.</p>
-<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>iris_remote <span class="ot">&lt;-</span> <span class="fu">copy_to</span>(con, iris, <span class="st">&quot;iris_table&quot;</span>, <span class="at">temporary =</span> <span class="cn">FALSE</span>, <span class="at">overwrite =</span> <span class="cn">TRUE</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>iris_remote <span class="ot">&lt;-</span> <span class="fu">copy_to</span>(</span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>  con,</span>
+<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a>  iris,</span>
+<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a>  <span class="st">&quot;iris_table&quot;</span>,</span>
+<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a>  <span class="at">temporary =</span> <span class="cn">FALSE</span>,</span>
+<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a>  <span class="at">overwrite =</span> <span class="cn">TRUE</span></span>
+<span id="cb8-7"><a href="#cb8-7" tabindex="-1"></a>)</span></code></pre></div>
 </div>
 <div id="connection-management" class="section level2">
 <h2>Connection Management</h2>

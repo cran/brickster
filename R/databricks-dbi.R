@@ -28,7 +28,9 @@ setClass(
     token = "characterOrNULL",
     catalog = "character",
     schema = "character",
-    staging_volume = "character"
+    staging_volume = "character",
+    max_active_connections = "numeric",
+    fetch_timeout = "numeric"
   )
 )
 
@@ -78,6 +80,10 @@ setMethod("show", "DatabricksDriver", function(object) {
 #' @param catalog Optional catalog name to use as default
 #' @param schema Optional schema name to use as default
 #' @param staging_volume Optional volume path for large dataset staging
+#' @param max_active_connections Maximum number of concurrent download
+#' connections when fetching query results (default: 30)
+#' @param fetch_timeout Timeout in seconds for downloading each result chunk
+#' (default: 300)
 #' @param token Authentication token (defaults to db_token())
 #' @param host Databricks workspace host (defaults to db_host())
 #' @param ... Additional arguments (ignored)
@@ -92,6 +98,8 @@ setMethod(
     catalog = NULL,
     schema = NULL,
     staging_volume = NULL,
+    max_active_connections = 30,
+    fetch_timeout = 300,
     token = db_token(),
     host = db_host(),
     ...
@@ -103,6 +111,14 @@ setMethod(
       cli::cli_abort("warehouse_id must be provided and non-empty")
     }
 
+    if (!is.numeric(max_active_connections) || max_active_connections <= 0) {
+      cli::cli_abort("max_active_connections must be a positive numeric value")
+    }
+
+    if (!is.numeric(fetch_timeout) || fetch_timeout <= 0) {
+      cli::cli_abort("fetch_timeout must be a positive numeric value")
+    }
+
     # Validate connection by testing a simple query
     tryCatch(
       {
@@ -112,6 +128,8 @@ setMethod(
           disposition = "INLINE",
           catalog = catalog,
           schema = schema,
+          max_active_connections = max_active_connections,
+          fetch_timeout = fetch_timeout,
           host = host,
           token = token,
           show_progress = FALSE
@@ -132,7 +150,9 @@ setMethod(
       token = token,
       catalog = if (is.null(catalog)) "" else catalog,
       schema = if (is.null(schema)) "" else schema,
-      staging_volume = if (is.null(staging_volume)) "" else staging_volume
+      staging_volume = if (is.null(staging_volume)) "" else staging_volume,
+      max_active_connections = max_active_connections,
+      fetch_timeout = fetch_timeout
     )
   }
 )
@@ -177,6 +197,8 @@ setMethod("show", "DatabricksConnection", function(object) {
   if (!is.null(object@staging_volume) && nchar(object@staging_volume) > 0) {
     cat("  Staging Volume:", object@staging_volume, "\n")
   }
+  cat("  Max Active Connections:", object@max_active_connections, "\n")
+  cat("  Fetch Timeout (s):", object@fetch_timeout, "\n")
 })
 
 # Query Methods ----------------------------------------------------------------
@@ -258,6 +280,8 @@ setMethod(
       schema = if (nchar(conn@schema) > 0) conn@schema else NULL,
       return_arrow = FALSE,
       disposition = disposition,
+      max_active_connections = conn@max_active_connections,
+      fetch_timeout = conn@fetch_timeout,
       host = conn@host,
       token = conn@token,
       show_progress = show_progress
@@ -390,7 +414,8 @@ setMethod("dbFetch", "DatabricksResult", function(res, n = -1, ...) {
       statement_id = res@statement_id,
       manifest = status$manifest,
       return_arrow = FALSE,
-      max_active_connections = 30,
+      max_active_connections = res@connection@max_active_connections,
+      fetch_timeout = res@connection@fetch_timeout,
       row_limit = if (n > 0) n else NULL,
       host = res@connection@host,
       token = res@connection@token,
@@ -667,6 +692,8 @@ setMethod(
       schema = if (nchar(conn@schema) > 0) conn@schema else NULL,
       return_arrow = FALSE,
       disposition = "INLINE",
+      max_active_connections = conn@max_active_connections,
+      fetch_timeout = conn@fetch_timeout,
       host = conn@host,
       token = conn@token,
       show_progress = FALSE
@@ -1021,9 +1048,20 @@ setMethod(
     }
 
     # Check if we should use volume-based method
-    if (
-      db_should_use_volume_method(value, effective_staging_volume, temporary)
-    ) {
+    use_staging_volume <- db_should_use_volume_method(
+      value,
+      effective_staging_volume,
+      temporary
+    )
+
+    if (use_staging_volume) {
+      if (!rlang::is_installed("arrow")) {
+        cli::cli_abort(c(
+          "Volume-based writes require the {.pkg arrow} package.",
+          "i" = "Install it with {.code install.packages('arrow')}."
+        ))
+      }
+
       db_write_table_volume(
         conn,
         quoted_name,
@@ -1124,7 +1162,7 @@ db_write_table_standard <- function(
       db_append_with_select_values(conn, quoted_name, value)
     }
   } else {
-    # For create/overwrite, use atomic CTAS with VALUES
+    # For create/overwrite, explicitly create schema then insert rows
     db_create_table_as_select_values(
       conn,
       quoted_name,
@@ -1217,7 +1255,7 @@ db_generate_values_sql <- function(conn, data) {
       if (is.na(val)) {
         "NULL"
       } else if (is.character(val)) {
-        paste0("'", gsub("'", "''", val), "'") # Escape single quotes
+        db_escape_string_literal(conn, val)
       } else if (is.logical(val)) {
         if (val) "TRUE" else "FALSE"
       } else {
@@ -1247,10 +1285,10 @@ db_generate_typed_values_sql <- function(conn, data) {
         as.character(val)
       } else if (is.character(col_data)) {
         # Quote string values and escape single quotes
-        paste0("'", gsub("'", "''", val), "'")
+        db_escape_string_literal(conn, val)
       } else {
         # Default to quoted string for other types
-        paste0("'", gsub("'", "''", as.character(val)), "'")
+        db_escape_string_literal(conn, as.character(val))
       }
     })
     paste0("(", paste(values, collapse = ", "), ")")
@@ -1259,7 +1297,20 @@ db_generate_typed_values_sql <- function(conn, data) {
   paste(row_values, collapse = ", ")
 }
 
-#' Create table using atomic CTAS with VALUES
+#' Escape string literals for inline SQL VALUES
+#' @keywords internal
+db_escape_string_literal <- function(conn, val) {
+  if (is.na(val)) {
+    return("NULL")
+  }
+
+  # Spark SQL accepts backslash-escaped quotes; escape backslashes first
+  escaped <- gsub("\\\\", "\\\\\\\\", val)
+  escaped <- gsub("'", "\\\\'", escaped)
+  paste0("'", escaped, "'")
+}
+
+#' Create table with explicit schema before inserting values
 #' @keywords internal
 db_create_table_as_select_values <- function(
   conn,
@@ -1274,60 +1325,26 @@ db_create_table_as_select_values <- function(
       "Temporary tables are not supported with the SQL Statement Execution API"
     )
   }
-  if (nrow(value) == 0) {
-    # For empty data, fall back to CREATE TABLE with schema
-    db_create_table_from_data(
-      conn,
-      quoted_name,
-      value,
-      field.types,
-      temporary,
-      overwrite
-    )
-    return()
-  }
 
-  # Build table creation keywords
-  if (temporary) {
-    table_keyword <- "CREATE TEMPORARY TABLE"
-  } else if (overwrite) {
-    table_keyword <- "CREATE OR REPLACE TABLE"
-  } else {
-    table_keyword <- "CREATE TABLE"
-  }
-
-  # Get column names with proper quoting
-  col_names <- purrr::map_chr(names(value), ~ dbQuoteIdentifier(conn, .x))
-  col_list <- paste(col_names, collapse = ", ")
-
-  # Generate VALUES clause with type-aware formatting
-  values_sql <- db_generate_typed_values_sql(conn, value)
-
-  # Build complete CTAS statement
-  ctas_sql <- paste0(
-    table_keyword,
-    " ",
+  # First create the table with explicit column definitions to avoid
+  # Databricks inferring overly specific types (e.g., DECIMAL(6, 4)).
+  db_create_table_from_data(
+    conn,
     quoted_name,
-    " AS SELECT * FROM VALUES ",
-    values_sql,
-    " AS t(",
-    col_list,
-    ")"
+    value,
+    field.types,
+    temporary,
+    overwrite
   )
 
-  # Execute using helper function
-  db_sql_exec_and_wait(
-    warehouse_id = conn@warehouse_id,
-    statement = ctas_sql,
-    catalog = if (nchar(conn@catalog) > 0) conn@catalog else NULL,
-    schema = if (nchar(conn@schema) > 0) conn@schema else NULL,
-    disposition = "INLINE",
-    format = "JSON_ARRAY",
-    wait_timeout = "10s",
-    host = conn@host,
-    token = conn@token,
-    show_progress = FALSE
-  )
+  # Nothing more to do if there are no rows to insert after seeding.
+  if (nrow(value) == 0) {
+    return(invisible(NULL))
+  }
+
+  # Populate the newly created table using INSERT ... SELECT ... VALUES so that
+  # the schema we just created is preserved for future appends.
+  db_append_with_select_values(conn, quoted_name, value)
 }
 
 #' Append data using atomic INSERT INTO with SELECT VALUES
@@ -1376,13 +1393,15 @@ db_should_use_volume_method <- function(
   n_rows <- nrow(value)
   has_volume <- !is.null(staging_volume) && nchar(staging_volume) > 0
 
+  # Always use a staging volume if its specified, regardless of size
+  if (has_volume) {
+    return(TRUE)
+  }
+
   # Temporary tables should use standard method (COPY INTO may not support them)
   if (temporary) {
     return(FALSE)
   }
-
-  # Check if arrow is available
-  has_arrow <- rlang::is_installed("arrow")
 
   # Check dataset size limits without volume staging
   if (!has_volume) {
@@ -1394,7 +1413,7 @@ db_should_use_volume_method <- function(
         "i" = "Use the {.arg staging_volume} parameter to enable volume-based uploads.",
         "i" = "Example: {.code dbWriteTable(conn, name, data, staging_volume = '/Volumes/catalog/schema/volume')}"
       ))
-    } else if (n_rows >= 20000 && has_arrow) {
+    } else if (n_rows >= 20000) {
       # Warn about performance for medium-large datasets
       cli::cli_warn(c(
         "Writing {n_rows} rows using standard SQL method will be slow.",
@@ -1404,7 +1423,7 @@ db_should_use_volume_method <- function(
     }
   }
 
-  has_volume && n_rows > 20000 && has_arrow
+  FALSE
 }
 
 #' Write table using volume-based approach
@@ -1434,15 +1453,15 @@ db_write_table_volume <- function(
     sample(10000:99999, 1)
   )
 
-  volume_dataset_path <- file.path(staging_volume, temp_dirname)
-  local_temp_dir <- file.path(tempdir(), temp_dirname)
+  volume_dataset_path <- fs::path(staging_volume, temp_dirname)
+  local_temp_dir <- fs::path(fs::path_temp(), temp_dirname)
 
   # Set up cleanup hooks to ensure cleanup happens even if there are errors
   on.exit(
     {
       # Cleanup local directory
-      if (dir.exists(local_temp_dir)) {
-        unlink(local_temp_dir, recursive = TRUE)
+      if (fs::dir_exists(local_temp_dir)) {
+        fs::dir_delete(local_temp_dir)
       }
 
       # Clean up volume directory (recursive since it contains files)

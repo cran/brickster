@@ -37,7 +37,7 @@ knitr::opts_chunk$set(
 
 ## -----------------------------------------------------------------------------
 # # small data (150 rows)
-# # generates an in-line CTAS
+# # creates the table schema explicitly then inserts rows inline
 # dbWriteTable(
 #   conn = con,
 #   name = Id(catalog = "<catalog>", schema = "<schema>", table = "<table>"),
@@ -54,7 +54,7 @@ knitr::opts_chunk$set(
 #   name = Id(catalog = "<catalog>", schema = "<schema>", table = "<table>"),
 #   value = iris_big,
 #   overwrite = TRUE,
-#   staging_volume = "/Volumes/<catalog>/<schema>/<volume>/..." # or inherited from connection
+#   staging_volume = "/Volumes/<catalog>/<schema>/<volume>/...", # or inherited from connection
 #   progress = TRUE
 # )
 # 
@@ -102,5 +102,11 @@ knitr::opts_chunk$set(
 #   collect()
 
 ## -----------------------------------------------------------------------------
-# iris_remote <- copy_to(con, iris, "iris_table", temporary = FALSE, overwrite = TRUE)
+# iris_remote <- copy_to(
+#   con,
+#   iris,
+#   "iris_table",
+#   temporary = FALSE,
+#   overwrite = TRUE
+# )
 
