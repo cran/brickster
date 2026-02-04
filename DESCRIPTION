@@ -1,39 +1,33 @@
 Package: brickster
 Title: R Toolkit for 'Databricks'
-Version: 0.2.11
-Authors@R: 
-  c(
-    person(given = "Zac",
-           family = "Davies",
-           role = c("aut", "cre"),
-           email = "zac@databricks.com"),
-    person(given = "Rafi",
-           family = "Kurlansik",
-           role = c("aut"),
-           email = "rafi.kurlansik@databricks.com"),
+Version: 0.2.12
+Authors@R: c(
+    person("Zac", "Davies", , "zac@databricks.com", role = c("aut", "cre")),
+    person("Rafi", "Kurlansik", , "rafi.kurlansik@databricks.com", role = "aut"),
     person("Databricks", role = c("cph", "fnd"))
   )
-Description: Collection of utilities that improve using 'Databricks' from R. 
-  Primarily functions that wrap specific 'Databricks' APIs
-  (<https://docs.databricks.com/api>), 'RStudio' connection pane support, quality
-  of life functions to make 'Databricks' simpler to use.
+Description: Collection of utilities that improve using 'Databricks' from
+    R.  Primarily functions that wrap specific 'Databricks' APIs
+    (<https://docs.databricks.com/api>), 'RStudio' connection pane
+    support, quality of life functions to make 'Databricks' simpler to
+    use.
 License: Apache License (>= 2)
-Encoding: UTF-8
+URL: https://github.com/databrickslabs/brickster
 Depends: R (>= 4.1.0)
-Imports: base64enc, cli, curl, DBI, dbplyr, dplyr, glue, fs, httr2 (>=
+Imports: base64enc, cli, curl, DBI, dbplyr, dplyr, fs, glue, httr2 (>=
         1.1.1), ini, jsonlite, methods, nanoarrow, purrr, R6, rlang,
         tibble, utils
-Suggests: arrow, testthat (>= 3.0.0), grid, huxtable, htmltools, knitr,
-        magick, rmarkdown, withr
-RoxygenNote: 7.3.2
+Suggests: arrow, grid, htmltools, huxtable, knitr, magick, rmarkdown,
+        testthat (>= 3.3.0), withr
 VignetteBuilder: knitr
-URL: https://github.com/databrickslabs/brickster
 Config/testthat/edition: 3
+Encoding: UTF-8
+RoxygenNote: 7.3.2
 NeedsCompilation: no
-Packaged: 2025-12-13 13:59:57 UTC; zachary.davies
+Packaged: 2026-02-03 22:19:55 UTC; zachary.davies
 Author: Zac Davies [aut, cre],
   Rafi Kurlansik [aut],
   Databricks [cph, fnd]
 Maintainer: Zac Davies <zac@databricks.com>
 Repository: CRAN
-Date/Publication: 2025-12-13 14:30:08 UTC
+Date/Publication: 2026-02-04 06:40:22 UTC

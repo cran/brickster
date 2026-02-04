@@ -463,12 +463,11 @@ init_script_info <- function(...) {
   obj <- list(...)
 
   # all must be one of `s3_storage_info`, `file_storage_info`, `dbfs_storage_info`
-  valid_storage <- vapply(
+  valid_storage <- purrr::map_lgl(
     obj,
     function(x) {
-      is.s3_storage_info(x) | is.file_storage_info(x) | is.dbfs_storage_info(x)
-    },
-    logical(1)
+      is.s3_storage_info(x) || is.file_storage_info(x) || is.dbfs_storage_info(x)
+    }
   )
 
   stopifnot(all(valid_storage))
@@ -554,8 +553,8 @@ new_cluster <- function(
   } else if (is.gcp_attributes(cloud_attrs)) {
     obj[["gcp_attributes"]] <- unclass(cloud_attrs)
   } else {
-    stop(
-      "Please use `aws_attributes()`, `azure_attributes()`, or `gcp_attributes()` to specify `cloud_attr`"
+    cli::cli_abort(
+      "Please use {.fn aws_attributes}, {.fn azure_attributes}, or {.fn gcp_attributes} to specify {.arg cloud_attrs}"
     )
   }
 
@@ -593,10 +592,10 @@ libraries <- function(...) {
 
   # all must be one of:
   # `lib_jar`, `lib_cran`, `lib_maven`, `lib_pypi`, `lib_whl`, `lib_egg`
-  valid_lib_type <- vapply(obj, is.library, logical(1))
+  valid_lib_type <- purrr::map_lgl(obj, is.library)
   stopifnot(all(valid_lib_type))
 
-  lib_type <- vapply(
+  lib_type <- purrr::map_chr(
     obj,
     function(x) {
       switch(
@@ -608,8 +607,7 @@ libraries <- function(...) {
         "MavenLibrary" = "maven",
         "CranLibrary" = "cran"
       )
-    },
-    character(1)
+    }
   )
 
   lib_objs <- list()
@@ -923,12 +921,11 @@ access_control_request <- function(...) {
   obj <- list(...)
 
   # all must be `access_control_req_user` or `access_control_req_group`
-  valid_control <- vapply(
+  valid_control <- purrr::map_lgl(
     obj,
     function(x) {
-      is.access_control_req_user(x) | is.access_control_req_group(x)
-    },
-    logical(1)
+      is.access_control_req_user(x) || is.access_control_req_group(x)
+    }
   )
 
   stopifnot(all(valid_control))
@@ -1475,7 +1472,7 @@ job_tasks <- function(...) {
   }
 
   # check that all inputs are job tasks
-  task_check <- vapply(obj, is.job_task, logical(1))
+  task_check <- purrr::map_lgl(obj, is.job_task)
   stopifnot(all(task_check))
 
   class(obj) <- c("JobTasks", "list")
@@ -1701,16 +1698,12 @@ delta_sync_index_spec <- function(
       is.list(embedding_source_columns) &&
         !is.embedding_source_column(embedding_source_columns)
     ) {
-      valid_columns <- vapply(
-        embedding_source_columns,
-        function(x) {
-          is.embedding_source_column(x)
-        },
-        logical(1)
+      valid_columns <- purrr::map_lgl(
+        embedding_source_columns, is.embedding_source_column
       )
       if (!all(valid_columns)) {
-        stop(
-          "`embedding_source_columns` must all be defined by `embedding_source_column` function"
+        cli::cli_abort(
+          "{.arg embedding_source_columns} must all be defined by {.fn embedding_source_column} function"
         )
       }
     } else {
@@ -1723,16 +1716,12 @@ delta_sync_index_spec <- function(
       is.list(embedding_vector_columns) &&
         !is.embedding_vector_column(embedding_vector_columns)
     ) {
-      valid_columns <- vapply(
-        embedding_vector_columns,
-        function(x) {
-          is.embedding_vector_column(x)
-        },
-        logical(1)
+      valid_columns <- purrr::map_lgl(
+        embedding_vector_columns, is.embedding_vector_column
       )
       if (!all(valid_columns)) {
-        stop(
-          "`embedding_vector_columns` must all be defined by `embedding_vector_column` function"
+        cli::cli_abort(
+          "{.arg embedding_vector_columns} must all be defined by {.fn embedding_vector_column} function"
         )
       }
     } else {
@@ -1740,7 +1729,7 @@ delta_sync_index_spec <- function(
     }
   }
 
-  if (is.null(embedding_vector_columns) & is.null(embedding_source_columns)) {
+  if (is.null(embedding_vector_columns) && is.null(embedding_source_columns)) {
     cli::cli_abort(
       "Must specify at least one embedding vector or source column"
     )
@@ -1797,16 +1786,12 @@ direct_access_index_spec <- function(
       is.list(embedding_source_columns) &&
         !is.embedding_source_column(embedding_source_columns)
     ) {
-      valid_columns <- vapply(
-        embedding_source_columns,
-        function(x) {
-          is.embedding_source_column(x)
-        },
-        logical(1)
+      valid_columns <- purrr::map_lgl(
+        embedding_source_columns, is.embedding_source_column
       )
       if (!all(valid_columns)) {
-        stop(
-          "`embedding_source_columns` must all be defined by `embedding_source_column` function"
+        cli::cli_abort(
+          "{.arg embedding_source_columns} must all be defined by {.fn embedding_source_column} function"
         )
       }
     } else {
@@ -1819,16 +1804,12 @@ direct_access_index_spec <- function(
       is.list(embedding_vector_columns) &&
         !is.embedding_vector_column(embedding_vector_columns)
     ) {
-      valid_columns <- vapply(
-        embedding_vector_columns,
-        function(x) {
-          is.embedding_vector_column(x)
-        },
-        logical(1)
+      valid_columns <- purrr::map_lgl(
+        embedding_vector_columns, is.embedding_vector_column
       )
       if (!all(valid_columns)) {
-        stop(
-          "`embedding_vector_columns` must all be defined by `embedding_vector_column` function"
+        cli::cli_abort(
+          "{.arg embedding_vector_columns} must all be defined by {.fn embedding_vector_column} function"
         )
       }
     } else {
@@ -1836,7 +1817,7 @@ direct_access_index_spec <- function(
     }
   }
 
-  if (is.null(embedding_vector_columns) & is.null(embedding_source_columns)) {
+  if (is.null(embedding_vector_columns) && is.null(embedding_source_columns)) {
     cli::cli_abort(
       "Must specify at least one embedding vector or source column"
     )

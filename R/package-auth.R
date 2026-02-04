@@ -72,8 +72,8 @@ db_host <- function(
 #' @description
 #' The function will check for a token in the `DATABRICKS_HOST` environment variable.
 #' `.databrickscfg` will be searched if `db_profile` and `use_databrickscfg` are set or
-#' if Posit Workbench managed OAuth credentials are detected.
-#' If none of the above are found then will default to using OAuth U2M flow.
+#' if Posit Workbench managed OAuth credentials are detected. If none of the above are
+#' found then `db_token()` returns `NULL`.
 #'
 #' Refer to [api authentication docs](https://docs.databricks.com/aws/en/dev-tools/auth)
 #'
@@ -82,14 +82,13 @@ db_host <- function(
 #' @inherit db_host details
 #' @inheritParams db_host
 #' @return databricks token
-#' @import cli
 #' @export
 db_token <- function(profile = default_config_profile()) {
   # if `use_databricks_cfg()` returns `TRUE` then fetch the associated env.
   # env is specified via `db_env` option, if missing use default.
   # this behaviour can only be changed via setting of config
   if (use_databricks_cfg()) {
-    token <- read_databrickscfg(key = "token", profile = profile)
+    token <- read_databrickscfg(key = "token", profile = profile, error = FALSE)
     return(token)
   }
 
@@ -111,7 +110,6 @@ db_token <- function(profile = default_config_profile()) {
 #' @inherit db_host details
 #' @inheritParams db_host
 #' @return databricks workspace ID
-#' @import cli
 #' @export
 db_wsid <- function(profile = default_config_profile()) {
   if (use_databricks_cfg()) {
@@ -133,7 +131,7 @@ db_wsid <- function(profile = default_config_profile()) {
 db_read_netrc <- function(path = "~/.netrc") {
   # nocov start
   params <- readLines(path, warn = FALSE)
-  params <- lapply(strsplit(params, " "), `[`, 2)
+  params <- lapply(strsplit(params, " ", fixed = TRUE), `[`, 2)
   setNames(params, c("machine", "login", "password"))
   # nocov end
 }
@@ -152,15 +150,16 @@ NULL
 #' or, Sys.getenv("USERPROFILE") on windows.
 #' An alternate location will be used if the environment variable `DATABRICKS_CONFIG_FILE` is set.
 #'
-#' @param key The value to fetch from profile. One of `token`, `host`, or `wsid`
+#' @param key The value to fetch from profile. One of `token`, `host`, `wsid`,
+#' `client_id`, or `client_secret`
 #' @param profile Character, the name of the profile to retrieve values
 #'
 #' @return named list of values associated with profile
-#' @import cli
 #' @keywords internal
 read_databrickscfg <- function(
-  key = c("token", "host", "wsid"),
-  profile = NULL
+  key = c("token", "host", "wsid", "client_id", "client_secret"),
+  profile = NULL,
+  error = TRUE
 ) {
   key <- match.arg(key)
 
@@ -172,7 +171,7 @@ read_databrickscfg <- function(
 
   # use the .databrickscfg location specified in DATABRICKS_CONFIG_FILE
   databricks_config_file <- Sys.getenv("DATABRICKS_CONFIG_FILE")
-  if (nchar(databricks_config_file) == 0) {
+  if (!nzchar(databricks_config_file)) {
     config_path <- fs::path(home_dir, ".databrickscfg")
   } else {
     config_path <- databricks_config_file
@@ -184,20 +183,24 @@ read_databrickscfg <- function(
 
   # return error in case of empty profile
   if (is.null(vars)) {
-    stop(cli::format_error(c(
+    cli::cli_abort(c(
       "Specified {.var profile} not found in {.file `{config_path}`}:",
       "x" = "Need to specify {.envvar {profile}} profile within {.file {config_path}} file."
-    )))
+    ))
   }
 
   # attempt to fetch required key & value pair from profile
   # error if key isn't found
   value <- vars[[key]]
   if (is.null(value)) {
-    stop(cli::format_error(c(
-      "Parameter {.var {key}} not found in {.envvar {profile}} profile of {.file {config_path}}:",
-      "x" = "Need to specify {.envvar {key}} in {.envvar {profile}} profile."
-    )))
+    if (error) {
+      cli::cli_abort(c(
+        "Parameter {.var {key}} not found in {.envvar {profile}} profile of {.file {config_path}}:",
+        "x" = "Need to specify {.envvar {key}} in {.envvar {profile}} profile."
+      ))
+    } else {
+      value <- NULL
+    }
   }
 
   value
@@ -206,14 +209,15 @@ read_databrickscfg <- function(
 #' Reads Environment Variables
 #' @details Fetches relevant environment variables based on profile
 #'
-#' @param key The value to fetch from profile. One of `token`, `host`, or `wsid`
+#' @param key The value to fetch from profile. One of `token`, `host`, `wsid`,
+#' `client_id`, or `client_secret`
 #' @param profile Character, the name of the profile to retrieve values
 #' @param error Boolean, when key isn't found should error be raised
 #'
 #' @return named list of values associated with profile
 #' @keywords internal
 read_env_var <- function(
-  key = c("token", "host", "wsid"),
+  key = c("token", "host", "wsid", "client_id", "client_secret"),
   profile = NULL,
   error = TRUE
 ) {
@@ -228,12 +232,12 @@ read_env_var <- function(
 
   value <- Sys.getenv(key_name)
 
-  if (value == "") {
+  if (!nzchar(value)) {
     if (error) {
-      stop(cli::format_error(c(
+      cli::cli_abort(c(
         "Environment variable {.var {key_name}} not found:",
         "x" = "Need to specify {.var {key_name}} environment variable."
-      )))
+      ))
     } else {
       value <- NULL
     }
@@ -242,28 +246,82 @@ read_env_var <- function(
   value
 }
 
+db_client_id <- function(profile = default_config_profile()) {
+  if (use_databricks_cfg()) {
+    client_id <- read_databrickscfg(
+      key = "client_id",
+      profile = profile,
+      error = FALSE
+    )
+    return(client_id)
+  }
+
+  read_env_var(key = "client_id", profile = profile, error = FALSE)
+}
+
+db_client_secret <- function(profile = default_config_profile()) {
+  if (use_databricks_cfg()) {
+    client_secret <- read_databrickscfg(
+      key = "client_secret",
+      profile = profile,
+      error = FALSE
+    )
+    return(client_secret)
+  }
+
+  read_env_var(
+    key = "client_secret",
+    profile = profile,
+    error = FALSE
+  )
+}
 
 #' Create OAuth 2.0 Client
-#' @details Creates an OAuth 2.0 Client, support for U2M flows only.
-#' May later be extended for account U2M and all M2M flows.
+#' @details Creates an OAuth 2.0 Client for U2M or M2M flows.
 #'
 #' @inheritParams auth_params
 #'
-#' @return List that contains httr2_oauth_client and relevant auth url
+#' @param client_id OAuth M2M client id.
+#' @param client_secret OAuth M2M client secret.
+#'
+#' @details
+#' If `client_id` and `client_secret` are detected then an M2M auth flow will occur.
+#' Otherwise it falls back to U2M.
+#'
+#' @return List that contains [httr2::oauth_client()], relevant `auth_url`, and `is_m2m`
 #' @keywords internal
-db_oauth_client <- function(host = db_host()) {
+db_oauth_client <- function(
+  host = db_host(),
+  client_id = db_client_id(),
+  client_secret = db_client_secret()
+) {
+  is_m2m <- !is.null(client_id) &&
+    nzchar(client_id) &&
+    !is.null(client_secret) &&
+    nzchar(client_secret)
+
   ws_token_url = glue::glue("https://{host}/oidc/v1/token", host = host)
   ws_auth_url = glue::glue("https://{host}/oidc/v1/authorize", host = host)
 
-  client <- httr2::oauth_client(
-    id = "databricks-cli",
-    token_url = ws_token_url,
-    name = "brickster"
-  )
+  if (is_m2m) {
+    client <- httr2::oauth_client(
+      id = client_id,
+      secret = client_secret,
+      token_url = ws_token_url,
+      name = "brickster"
+    )
+  } else {
+    client <- httr2::oauth_client(
+      id = "databricks-cli",
+      token_url = ws_token_url,
+      name = "brickster"
+    )
+  }
 
   client_and_auth <- list(
     client = client,
-    auth_url = ws_auth_url
+    auth_url = ws_auth_url,
+    is_m2m = is_m2m
   )
 
   # add option for client to be fetched via request helpers
@@ -280,7 +338,7 @@ db_oauth_client <- function(host = db_host()) {
 #' @keywords internal
 default_config_profile <- function() {
   profile <- Sys.getenv("DATABRICKS_CONFIG_PROFILE")
-  if (nchar(profile) != 0) {
+  if (nzchar(profile)) {
     profile
   } else {
     getOption("db_profile")

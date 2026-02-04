@@ -5,7 +5,6 @@
 #' built on top of the existing `db_sql_query()` infrastructure.
 #'
 #' @importFrom methods new setClass setMethod
-#' @importFrom cli cli_abort
 #' @import DBI
 #' @name databricks-dbi
 NULL
@@ -75,8 +74,12 @@ setMethod("show", "DatabricksDriver", function(object) {
 
 #' Connect to Databricks SQL Warehouse
 #'
+#' @details Provide either `warehouse_id` or `http_path`. When `http_path` is
+#'   supplied, the warehouse ID is extracted from the `/warehouses/<id>` segment.
 #' @param drv A DatabricksDriver object
-#' @param warehouse_id ID of the SQL warehouse to connect to
+#' @param warehouse_id Optional ID of the SQL warehouse to connect to
+#' @param http_path Optional HTTP path for the SQL warehouse; if provided,
+#'   the warehouse ID is extracted from this path
 #' @param catalog Optional catalog name to use as default
 #' @param schema Optional schema name to use as default
 #' @param staging_volume Optional volume path for large dataset staging
@@ -94,7 +97,8 @@ setMethod(
   "DatabricksDriver",
   function(
     drv,
-    warehouse_id,
+    warehouse_id = NULL,
+    http_path = NULL,
     catalog = NULL,
     schema = NULL,
     staging_volume = NULL,
@@ -106,9 +110,22 @@ setMethod(
   ) {
     # Validate required parameters
     if (
-      missing(warehouse_id) || is.null(warehouse_id) || nchar(warehouse_id) == 0
+      !is.null(warehouse_id) &&
+        nzchar(warehouse_id) &&
+        !is.null(http_path) &&
+        nzchar(http_path)
     ) {
-      cli::cli_abort("warehouse_id must be provided and non-empty")
+      cli::cli_abort("Specify only one of warehouse_id or http_path")
+    }
+
+    if (is.null(warehouse_id) || !nzchar(warehouse_id)) {
+      if (!is.null(http_path) && nzchar(http_path)) {
+        warehouse_id <- warehouse_id_from_http_path(http_path)
+      } else {
+        cli::cli_abort(
+          "warehouse_id or http_path must be provided and non-empty"
+        )
+      }
     }
 
     if (!is.numeric(max_active_connections) || max_active_connections <= 0) {
@@ -143,24 +160,28 @@ setMethod(
     )
 
     # Create connection object
-    new(
+    con <- new(
       "DatabricksConnection",
       warehouse_id = warehouse_id,
       host = host,
       token = token,
-      catalog = if (is.null(catalog)) "" else catalog,
-      schema = if (is.null(schema)) "" else schema,
-      staging_volume = if (is.null(staging_volume)) "" else staging_volume,
+      catalog = catalog %||% "",
+      schema = schema %||% "",
+      staging_volume = staging_volume %||% "",
       max_active_connections = max_active_connections,
       fetch_timeout = fetch_timeout
     )
+
+    dbi_connection_opened(con)
+
+    con
   }
 )
 
 #' Disconnect from Databricks
 #' @param conn A DatabricksConnection object
 #' @param ... Additional arguments (ignored)
-#' @return TRUE (invisibly)
+#' @return `TRUE` (invisibly)
 #' @export
 setMethod("dbDisconnect", "DatabricksConnection", function(conn, ...) {
   # Databricks connections are stateless, so just return TRUE
@@ -170,14 +191,14 @@ setMethod("dbDisconnect", "DatabricksConnection", function(conn, ...) {
 #' Check if connection is valid
 #' @param dbObj A DatabricksConnection object
 #' @param ... Additional arguments (ignored)
-#' @return TRUE if connection is valid, FALSE otherwise
+#' @return `TRUE` if connection is valid, `FALSE` otherwise
 #' @export
 setMethod("dbIsValid", "DatabricksConnection", function(dbObj, ...) {
   # Check if connection has required fields
   !is.null(dbObj@warehouse_id) &&
-    nchar(dbObj@warehouse_id) > 0 &&
+    nzchar(dbObj@warehouse_id) &&
     !is.null(dbObj@host) &&
-    nchar(dbObj@host) > 0
+    nzchar(dbObj@host)
 })
 
 
@@ -188,13 +209,13 @@ setMethod("show", "DatabricksConnection", function(object) {
   cat("<DatabricksConnection>\n")
   cat("  Warehouse ID:", object@warehouse_id, "\n")
   cat("  Host:", object@host, "\n")
-  if (nchar(object@catalog) > 0) {
+  if (nzchar(object@catalog)) {
     cat("  Catalog:", object@catalog, "\n")
   }
-  if (nchar(object@schema) > 0) {
+  if (nzchar(object@schema)) {
     cat("  Schema:", object@schema, "\n")
   }
-  if (!is.null(object@staging_volume) && nchar(object@staging_volume) > 0) {
+  if (!is.null(object@staging_volume) && nzchar(object@staging_volume)) {
     cat("  Staging Volume:", object@staging_volume, "\n")
   }
   cat("  Max Active Connections:", object@max_active_connections, "\n")
@@ -213,19 +234,14 @@ setMethod(
   "dbSendQuery",
   signature = c(conn = "DatabricksConnection", statement = "character"),
   function(conn, statement, ...) {
-    # Validate inputs
-    if (
-      missing(statement) || is.null(statement) || nchar(trimws(statement)) == 0
-    ) {
-      cli::cli_abort("statement must be provided and non-empty")
-    }
+    db_assert_statement(statement)
 
     # Execute query asynchronously
     resp <- db_sql_exec_query(
       warehouse_id = conn@warehouse_id,
       statement = statement,
-      catalog = if (nchar(conn@catalog) > 0) conn@catalog else NULL,
-      schema = if (nchar(conn@schema) > 0) conn@schema else NULL,
+      catalog = if (nzchar(conn@catalog)) conn@catalog else NULL,
+      schema = if (nzchar(conn@schema)) conn@schema else NULL,
       disposition = "EXTERNAL_LINKS",
       format = "ARROW_STREAM",
       wait_timeout = "0s", # Async execution
@@ -251,7 +267,7 @@ setMethod(
 #' @param statement SQL statement to execute
 #' @param disposition Query disposition mode: "EXTERNAL_LINKS" (default) for large results,
 #'   "INLINE" for small metadata queries (automatically chooses appropriate format)
-#' @param show_progress If TRUE, show progress updates during query execution (default: TRUE)
+#' @param show_progress If `TRUE`, show progress updates during query execution (default: `TRUE`)
 #' @param ... Additional arguments passed to underlying query execution
 #' @return A data.frame with query results
 #' @export
@@ -276,15 +292,16 @@ setMethod(
     db_sql_query(
       warehouse_id = conn@warehouse_id,
       statement = statement,
-      catalog = if (nchar(conn@catalog) > 0) conn@catalog else NULL,
-      schema = if (nchar(conn@schema) > 0) conn@schema else NULL,
+      catalog = if (nzchar(conn@catalog)) conn@catalog else NULL,
+      schema = if (nzchar(conn@schema)) conn@schema else NULL,
       return_arrow = FALSE,
       disposition = disposition,
       max_active_connections = conn@max_active_connections,
       fetch_timeout = conn@fetch_timeout,
       host = conn@host,
       token = conn@token,
-      show_progress = show_progress
+      show_progress = show_progress,
+      ...
     )
   }
 )
@@ -300,19 +317,14 @@ setMethod(
   "dbSendStatement",
   signature = c(conn = "DatabricksConnection", statement = "character"),
   function(conn, statement, ...) {
-    # Validate inputs
-    if (
-      missing(statement) || is.null(statement) || nchar(trimws(statement)) == 0
-    ) {
-      cli::cli_abort("statement must be provided and non-empty")
-    }
+    db_assert_statement(statement)
 
     # Execute statement asynchronously
     resp <- db_sql_exec_query(
       warehouse_id = conn@warehouse_id,
       statement = statement,
-      catalog = if (nchar(conn@catalog) > 0) conn@catalog else NULL,
-      schema = if (nchar(conn@schema) > 0) conn@schema else NULL,
+      catalog = if (nzchar(conn@catalog)) conn@catalog else NULL,
+      schema = if (nzchar(conn@schema)) conn@schema else NULL,
       disposition = "EXTERNAL_LINKS",
       format = "ARROW_STREAM",
       wait_timeout = "0s", # Async execution
@@ -342,19 +354,14 @@ setMethod(
   "dbExecute",
   signature = c(conn = "DatabricksConnection", statement = "character"),
   function(conn, statement, ...) {
-    # Validate inputs
-    if (
-      missing(statement) || is.null(statement) || nchar(trimws(statement)) == 0
-    ) {
-      cli::cli_abort("statement must be provided and non-empty")
-    }
+    db_assert_statement(statement)
 
     # Execute statement synchronously to get metadata without loading data
     status <- db_sql_exec_and_wait(
       warehouse_id = conn@warehouse_id,
       statement = statement,
-      catalog = if (nchar(conn@catalog) > 0) conn@catalog else NULL,
-      schema = if (nchar(conn@schema) > 0) conn@schema else NULL,
+      catalog = if (nzchar(conn@catalog)) conn@catalog else NULL,
+      schema = if (nzchar(conn@schema)) conn@schema else NULL,
       disposition = "EXTERNAL_LINKS",
       format = "ARROW_STREAM",
       wait_timeout = "10s",
@@ -411,8 +418,7 @@ setMethod("dbFetch", "DatabricksResult", function(res, n = -1, ...) {
   } else {
     # Use helper function to fetch results with progress
     results <- db_sql_fetch_results(
-      statement_id = res@statement_id,
-      manifest = status$manifest,
+      resp = status,
       return_arrow = FALSE,
       max_active_connections = res@connection@max_active_connections,
       fetch_timeout = res@connection@fetch_timeout,
@@ -433,7 +439,7 @@ setMethod("dbFetch", "DatabricksResult", function(res, n = -1, ...) {
 #' Check if query has completed
 #' @param res A DatabricksResult object
 #' @param ... Additional arguments (ignored)
-#' @return TRUE if query is complete, FALSE otherwise
+#' @return `TRUE` if query is complete, `FALSE` otherwise
 #' @export
 setMethod("dbHasCompleted", "DatabricksResult", function(res, ...) {
   if (res@completed) {
@@ -453,7 +459,7 @@ setMethod("dbHasCompleted", "DatabricksResult", function(res, ...) {
 #' Clear result set
 #' @param res A DatabricksResult object
 #' @param ... Additional arguments (ignored)
-#' @return TRUE (invisibly)
+#' @return `TRUE` (invisibly)
 #' @export
 setMethod("dbClearResult", "DatabricksResult", function(res, ...) {
   # Databricks automatically cleans up after a period of time
@@ -538,14 +544,12 @@ setMethod("show", "DatabricksResult", function(object) {
 #' @return Character vector of table names
 #' @export
 setMethod("dbListTables", "DatabricksConnection", function(conn, ...) {
-  if (!dbIsValid(conn)) {
-    cli::cli_abort("Connection is not valid")
-  }
+  db_assert_valid_conn(conn)
 
   # Use SQL query approach (standard for DBI drivers)
-  sql <- if (nchar(conn@catalog) > 0 && nchar(conn@schema) > 0) {
+  sql <- if (nzchar(conn@catalog) && nzchar(conn@schema)) {
     paste0("SHOW TABLES IN ", conn@catalog, ".", conn@schema)
-  } else if (nchar(conn@schema) > 0) {
+  } else if (nzchar(conn@schema)) {
     paste0("SHOW TABLES IN ", conn@schema)
   } else {
     "SHOW TABLES"
@@ -568,18 +572,16 @@ setMethod("dbListTables", "DatabricksConnection", function(conn, ...) {
 #' @param conn A DatabricksConnection object
 #' @param name Table name to check
 #' @param ... Additional arguments (ignored)
-#' @return TRUE if table exists, FALSE otherwise
+#' @return `TRUE` if table exists, `FALSE` otherwise
 #' @export
 setMethod(
   "dbExistsTable",
   signature = c(conn = "DatabricksConnection", name = "character"),
   function(conn, name, ...) {
-    if (!dbIsValid(conn)) {
-      cli::cli_abort("Connection is not valid")
-    }
+    db_assert_valid_conn(conn)
 
     # Clean table name - remove quotes if present
-    clean_name <- gsub('^\"|\"$', '', name)
+    clean_name <- db_clean_table_name(name)
 
     # Use DESCRIBE TABLE to check existence
     tryCatch(
@@ -599,15 +601,13 @@ setMethod(
 #' @param conn A DatabricksConnection object
 #' @param name Table name as Id object
 #' @param ... Additional arguments (ignored)
-#' @return TRUE if table exists, FALSE otherwise
+#' @return `TRUE` if table exists, `FALSE` otherwise
 #' @export
 setMethod(
   "dbExistsTable",
   signature = c(conn = "DatabricksConnection", name = "Id"),
   function(conn, name, ...) {
-    if (!dbIsValid(conn)) {
-      cli::cli_abort("Connection is not valid")
-    }
+    db_assert_valid_conn(conn)
 
     # Convert Id to quoted string
     quoted_name <- dbQuoteIdentifier(conn, name)
@@ -630,19 +630,228 @@ setMethod(
 #' @param conn A DatabricksConnection object
 #' @param name Table name as AsIs object (from I())
 #' @param ... Additional arguments (ignored)
-#' @return TRUE if table exists, FALSE otherwise
+#' @return `TRUE` if table exists, `FALSE` otherwise
 #' @export
 setMethod(
   "dbExistsTable",
   signature = c(conn = "DatabricksConnection", name = "AsIs"),
   function(conn, name, ...) {
-    if (!dbIsValid(conn)) {
-      cli::cli_abort("Connection is not valid")
-    }
+    db_assert_valid_conn(conn)
 
     # Convert AsIs to character and use the character method
     char_name <- as.character(name)
     dbExistsTable(conn, char_name)
+  }
+)
+
+#' Remove a Databricks table
+#' @param conn A DatabricksConnection object
+#' @param name Table name to remove
+#' @param ... Additional arguments (ignored)
+#' @return `TRUE` invisibly on success
+#' @export
+setMethod(
+  "dbRemoveTable",
+  signature = c(conn = "DatabricksConnection", name = "character"),
+  function(conn, name, ...) {
+    db_assert_valid_conn(conn)
+
+    # Clean table name - remove quotes if present
+    clean_name <- db_clean_table_name(name)
+
+    sql <- paste0("DROP TABLE ", clean_name)
+    dbExecute(conn, sql)
+    invisible(TRUE)
+  }
+)
+
+#' Remove a Databricks table (Id method)
+#' @param conn A DatabricksConnection object
+#' @param name Table name as Id object
+#' @param ... Additional arguments (ignored)
+#' @return `TRUE` invisibly on success
+#' @export
+setMethod(
+  "dbRemoveTable",
+  signature = c(conn = "DatabricksConnection", name = "Id"),
+  function(conn, name, ...) {
+    db_assert_valid_conn(conn)
+
+    # Convert Id to quoted string
+    quoted_name <- dbQuoteIdentifier(conn, name)
+
+    sql <- paste0("DROP TABLE ", quoted_name)
+    dbExecute(conn, sql)
+    invisible(TRUE)
+  }
+)
+
+#' Remove a Databricks table (AsIs method)
+#' @param conn A DatabricksConnection object
+#' @param name Table name as AsIs object (from I())
+#' @param ... Additional arguments (ignored)
+#' @return `TRUE` invisibly on success
+#' @export
+setMethod(
+  "dbRemoveTable",
+  signature = c(conn = "DatabricksConnection", name = "AsIs"),
+  function(conn, name, ...) {
+    db_assert_valid_conn(conn)
+
+    # Convert AsIs to character and use the character method
+    char_name <- as.character(name)
+    dbRemoveTable(conn, char_name)
+  }
+)
+
+#' Read a Databricks table
+#' @param conn A DatabricksConnection object
+#' @param name Table name to read
+#' @param ... Additional arguments passed to dbGetQuery
+#' @return A data.frame with table contents
+#' @export
+setMethod(
+  "dbReadTable",
+  signature = c(conn = "DatabricksConnection", name = "character"),
+  function(conn, name, ...) {
+    db_assert_valid_conn(conn)
+
+    # Clean table name - remove quotes if present
+    clean_name <- db_clean_table_name(name)
+
+    sql <- paste0("SELECT * FROM ", clean_name)
+    dbGetQuery(conn, sql, ...)
+  }
+)
+
+#' Read a Databricks table (Id method)
+#' @param conn A DatabricksConnection object
+#' @param name Table name as Id object
+#' @param ... Additional arguments passed to dbGetQuery
+#' @return A data.frame with table contents
+#' @export
+setMethod(
+  "dbReadTable",
+  signature = c(conn = "DatabricksConnection", name = "Id"),
+  function(conn, name, ...) {
+    db_assert_valid_conn(conn)
+
+    # Convert Id to quoted string
+    quoted_name <- dbQuoteIdentifier(conn, name)
+
+    sql <- paste0("SELECT * FROM ", quoted_name)
+    dbGetQuery(conn, sql, ...)
+  }
+)
+
+#' Read a Databricks table (AsIs method)
+#' @param conn A DatabricksConnection object
+#' @param name Table name as AsIs object (from I())
+#' @param ... Additional arguments passed to dbGetQuery
+#' @return A data.frame with table contents
+#' @export
+setMethod(
+  "dbReadTable",
+  signature = c(conn = "DatabricksConnection", name = "AsIs"),
+  function(conn, name, ...) {
+    db_assert_valid_conn(conn)
+
+    # Convert AsIs to character and use the character method
+    char_name <- as.character(name)
+    dbReadTable(conn, char_name, ...)
+  }
+)
+
+#' Create an empty Databricks table
+#' @param conn A DatabricksConnection object
+#' @param name Table name to create
+#' @param fields Either a named character vector of types or a data frame
+#' @param row.names Ignored (included for DBI compatibility)
+#' @param temporary If `TRUE`, create temporary table (NOT SUPPORTED - will error)
+#' @param ... Additional arguments (ignored)
+#' @return `TRUE` invisibly on success
+#' @export
+setMethod(
+  "dbCreateTable",
+  signature = c(conn = "DatabricksConnection", name = "character"),
+  function(conn, name, fields, ..., row.names = NULL, temporary = FALSE) {
+    db_assert_valid_conn(conn)
+
+    if (temporary) {
+      cli::cli_abort(
+        "Temporary tables are not supported with the SQL Statement Execution API"
+      )
+    }
+
+    # Clean table name - remove quotes if present
+    clean_name <- db_clean_table_name(name)
+    fields_info <- db_prepare_create_table_fields(fields)
+    db_create_table_from_data(
+      conn,
+      clean_name,
+      fields_info$value,
+      fields_info$field_types,
+      temporary = temporary,
+      overwrite = FALSE
+    )
+    invisible(TRUE)
+  }
+)
+
+#' Create an empty Databricks table (Id method)
+#' @param conn A DatabricksConnection object
+#' @param name Table name as Id object
+#' @param fields Either a named character vector of types or a data frame
+#' @param row.names Ignored (included for DBI compatibility)
+#' @param temporary If `TRUE`, create temporary table (NOT SUPPORTED - will error)
+#' @param ... Additional arguments (ignored)
+#' @return `TRUE` invisibly on success
+#' @export
+setMethod(
+  "dbCreateTable",
+  signature = c(conn = "DatabricksConnection", name = "Id"),
+  function(conn, name, fields, ..., row.names = NULL, temporary = FALSE) {
+    db_assert_valid_conn(conn)
+
+    if (temporary) {
+      cli::cli_abort(
+        "Temporary tables are not supported with the SQL Statement Execution API"
+      )
+    }
+
+    # Convert Id to quoted string
+    quoted_name <- dbQuoteIdentifier(conn, name)
+    fields_info <- db_prepare_create_table_fields(fields)
+    db_create_table_from_data(
+      conn,
+      quoted_name,
+      fields_info$value,
+      fields_info$field_types,
+      temporary = temporary,
+      overwrite = FALSE
+    )
+    invisible(TRUE)
+  }
+)
+
+#' Create an empty Databricks table (AsIs method)
+#' @param conn A DatabricksConnection object
+#' @param name Table name as AsIs object (from I())
+#' @param fields Either a named character vector of types or a data frame
+#' @param row.names Ignored (included for DBI compatibility)
+#' @param temporary If `TRUE`, create temporary table (NOT SUPPORTED - will error)
+#' @param ... Additional arguments (ignored)
+#' @return `TRUE` invisibly on success
+#' @export
+setMethod(
+  "dbCreateTable",
+  signature = c(conn = "DatabricksConnection", name = "AsIs"),
+  function(conn, name, fields, ..., row.names = NULL, temporary = FALSE) {
+    db_assert_valid_conn(conn)
+
+    # Convert AsIs to character and use the character method
+    char_name <- as.character(name)
+    dbCreateTable(conn, char_name, fields, temporary = temporary, ...)
   }
 )
 
@@ -656,7 +865,7 @@ setMethod("dbGetInfo", "DatabricksConnection", function(dbObj, ...) {
     db.version = "Databricks SQL",
     dbname = paste0(
       dbObj@catalog,
-      if (nchar(dbObj@catalog) > 0 && nchar(dbObj@schema) > 0) "." else "",
+      if (nzchar(dbObj@catalog) && nzchar(dbObj@schema)) "." else "",
       dbObj@schema
     ),
     username = NA_character_,
@@ -676,20 +885,18 @@ setMethod(
   "dbListFields",
   signature = c(conn = "DatabricksConnection", name = "character"),
   function(conn, name, ...) {
-    if (!dbIsValid(conn)) {
-      cli::cli_abort("Connection is not valid")
-    }
+    db_assert_valid_conn(conn)
 
     # Clean table name - remove quotes if present
-    clean_name <- gsub('^"|"$', '', name)
+    clean_name <- db_clean_table_name(name)
 
     # Use DESCRIBE TABLE to get column information with inline disposition
     sql <- paste0("DESCRIBE TABLE ", clean_name)
     result <- db_sql_query(
       warehouse_id = conn@warehouse_id,
       statement = sql,
-      catalog = if (nchar(conn@catalog) > 0) conn@catalog else NULL,
-      schema = if (nchar(conn@schema) > 0) conn@schema else NULL,
+      catalog = if (nzchar(conn@catalog)) conn@catalog else NULL,
+      schema = if (nzchar(conn@schema)) conn@schema else NULL,
       return_arrow = FALSE,
       disposition = "INLINE",
       max_active_connections = conn@max_active_connections,
@@ -721,9 +928,7 @@ setMethod(
   "dbListFields",
   signature = c(conn = "DatabricksConnection", name = "AsIs"),
   function(conn, name, ...) {
-    if (!dbIsValid(conn)) {
-      cli::cli_abort("Connection is not valid")
-    }
+    db_assert_valid_conn(conn)
 
     # Convert AsIs to character and use the character method
     char_name <- as.character(name)
@@ -761,6 +966,38 @@ setMethod("dbRollback", "DatabricksConnection", function(conn, ...) {
 
 # Additional utility methods
 
+#' Assert that a connection is valid
+#' @keywords internal
+db_assert_valid_conn <- function(conn) {
+  if (!dbIsValid(conn)) {
+    cli::cli_abort("Connection is not valid")
+  }
+}
+
+#' Assert that a statement is provided
+#' @keywords internal
+db_assert_statement <- function(statement) {
+  if (missing(statement) || is.null(statement) || !nzchar(trimws(statement))) {
+    cli::cli_abort("statement must be provided and non-empty")
+  }
+}
+
+#' Extract warehouse ID from an http_path
+#' @keywords internal
+warehouse_id_from_http_path <- function(http_path) {
+  if (is.null(http_path) || !nzchar(http_path)) {
+    cli::cli_abort("http_path must be provided and non-empty")
+  }
+
+  sub("^/sql/1\\.0/warehouses/", "", http_path)
+}
+
+#' Clean table name input
+#' @keywords internal
+db_clean_table_name <- function(name) {
+  gsub('^\"|\"$', '', name)
+}
+
 #' Map R data types to Databricks SQL types
 #' @param dbObj A DatabricksConnection object
 #' @param obj R object(s) to get SQL types for
@@ -786,6 +1023,42 @@ setMethod("dbDataType", "DatabricksConnection", function(dbObj, obj, ...) {
   )
 })
 
+#' Prepare fields for CREATE TABLE
+#' @keywords internal
+db_prepare_create_table_fields <- function(fields) {
+  if (missing(fields) || is.null(fields)) {
+    cli::cli_abort("fields must be provided")
+  }
+
+  if (is.data.frame(fields)) {
+    if (ncol(fields) == 0) {
+      cli::cli_abort("fields must contain at least one column")
+    }
+    list(value = fields, field_types = NULL)
+  } else if (is.character(fields)) {
+    if (length(fields) == 0) {
+      cli::cli_abort("fields must contain at least one column")
+    }
+    field_names <- names(fields)
+    if (
+      is.null(field_names) ||
+        any(is.na(field_names) | !nzchar(field_names))
+    ) {
+      cli::cli_abort(
+        "fields must be a named character vector when provided as character"
+      )
+    }
+    empty_cols <- setNames(
+      replicate(length(fields), logical(0), simplify = FALSE),
+      field_names
+    )
+    value <- as.data.frame(empty_cols, stringsAsFactors = FALSE)
+    list(value = value, field_types = fields)
+  } else {
+    cli::cli_abort("fields must be a data frame or named character vector")
+  }
+}
+
 # Identifier Quoting Methods ----------------------------------------------------
 
 #' Quote identifiers for Databricks SQL
@@ -803,7 +1076,7 @@ setMethod(
       # Check if this is a three-part name (catalog.schema.table)
       if (grepl("^[^.]+\\.[^.]+\\.[^.]+$", single_x)) {
         # Split into parts and quote each separately
-        parts <- strsplit(single_x, "\\.")[[1]]
+        parts <- strsplit(single_x, ".", fixed = TRUE)[[1]]
         if (length(parts) == 3) {
           quoted_parts <- paste0("`", parts, "`")
           paste(quoted_parts, collapse = ".")
@@ -857,15 +1130,15 @@ setMethod(
 #' @param conn A DatabricksConnection object
 #' @param name Table name (character, Id, or SQL)
 #' @param value Data frame to write
-#' @param overwrite If TRUE, overwrite existing table
-#' @param append If TRUE, append to existing table
-#' @param row.names If TRUE, preserve row names as a column
-#' @param temporary If TRUE, create temporary table (NOT SUPPORTED - will error)
+#' @param overwrite If `TRUE`, overwrite existing table
+#' @param append If `TRUE`, append to existing table
+#' @param row.names If `TRUE`, preserve row names as a column
+#' @param temporary If `TRUE`, create temporary table (NOT SUPPORTED - will error)
 #' @param field.types Named character vector of SQL types for columns
 #' @param staging_volume Optional volume path for large dataset staging
-#' @param progress If TRUE, show progress bar for file uploads (default: TRUE)
+#' @param progress If `TRUE`, show progress bar for file uploads (default: `TRUE`)
 #' @param ... Additional arguments
-#' @return TRUE invisibly on success
+#' @return `TRUE` invisibly on success
 #' @export
 setMethod(
   "dbWriteTable",
@@ -918,7 +1191,7 @@ setMethod(
     # Use staging_volume from connection if not provided
     if (!is.null(staging_volume)) {
       effective_staging_volume <- staging_volume
-    } else if (nchar(conn@staging_volume) > 0) {
+    } else if (nzchar(conn@staging_volume)) {
       effective_staging_volume <- conn@staging_volume
     } else {
       effective_staging_volume <- NULL
@@ -971,15 +1244,15 @@ setMethod(
 #' @param conn A DatabricksConnection object
 #' @param name Table name as Id object
 #' @param value Data frame to write
-#' @param overwrite If TRUE, overwrite existing table
-#' @param append If TRUE, append to existing table
-#' @param row.names If TRUE, preserve row names as a column
-#' @param temporary If TRUE, create temporary table (NOT SUPPORTED - will error)
+#' @param overwrite If `TRUE`, overwrite existing table
+#' @param append If `TRUE`, append to existing table
+#' @param row.names If `TRUE`, preserve row names as a column
+#' @param temporary If `TRUE`, create temporary table (NOT SUPPORTED - will error)
 #' @param field.types Named character vector of SQL types for columns
 #' @param staging_volume Optional volume path for large dataset staging
-#' @param progress If TRUE, show progress bar for file uploads (default: TRUE)
+#' @param progress If `TRUE`, show progress bar for file uploads (default: `TRUE`)
 #' @param ... Additional arguments
-#' @return TRUE invisibly on success
+#' @return `TRUE` invisibly on success
 #' @export
 setMethod(
   "dbWriteTable",
@@ -1029,7 +1302,7 @@ setMethod(
 
     # Determine staging volume to use
     effective_staging_volume <- staging_volume
-    if (is.null(effective_staging_volume) && nchar(conn@staging_volume) > 0) {
+    if (is.null(effective_staging_volume) && nzchar(conn@staging_volume)) {
       effective_staging_volume <- conn@staging_volume
     }
 
@@ -1090,15 +1363,15 @@ setMethod(
 #' @param conn DatabricksConnection object
 #' @param name Table name as AsIs object (from I())
 #' @param value Data frame to write
-#' @param overwrite If TRUE, overwrite existing table
-#' @param append If TRUE, append to existing table
-#' @param row.names If TRUE, preserve row names as a column
-#' @param temporary If TRUE, create temporary table (NOT SUPPORTED - will error)
+#' @param overwrite If `TRUE`, overwrite existing table
+#' @param append If `TRUE`, append to existing table
+#' @param row.names If `TRUE`, preserve row names as a column
+#' @param temporary If `TRUE`, create temporary table (NOT SUPPORTED - will error)
 #' @param field.types Named character vector of SQL types for columns
 #' @param staging_volume Optional volume path for large dataset staging
-#' @param progress If TRUE, show progress bar for file uploads (default: TRUE)
+#' @param progress If `TRUE`, show progress bar for file uploads (default: `TRUE`)
 #' @param ... Additional arguments
-#' @return TRUE invisibly on success
+#' @return `TRUE` invisibly on success
 #' @export
 setMethod(
   "dbWriteTable",
@@ -1194,39 +1467,15 @@ db_create_table_from_data <- function(
   # Generate column definitions
   if (is.null(field.types)) {
     # Use automatic type mapping for each column
-    col_types <- purrr::map_chr(value, function(col) {
-      switch(
-        class(col)[1],
-        logical = "BOOLEAN",
-        integer = "INT",
-        numeric = "DOUBLE",
-        character = "STRING",
-        Date = "DATE",
-        POSIXct = "TIMESTAMP",
-        "STRING"
-      )
-    })
+    col_types <- dbDataType(conn, value)
   } else {
     # Use provided types
     col_types <- field.types[names(value)]
     # Fill missing types with automatic mapping
-    missing_types <- is.na(col_types) |
-      names(value) %in% names(field.types) == FALSE
-    col_types[missing_types] <- purrr::map_chr(
-      value[missing_types],
-      function(col) {
-        switch(
-          class(col)[1],
-          logical = "BOOLEAN",
-          integer = "INT",
-          numeric = "DOUBLE",
-          character = "STRING",
-          Date = "DATE",
-          POSIXct = "TIMESTAMP",
-          "STRING"
-        )
-      }
-    )
+    missing_types <- is.na(col_types) | !names(value) %in% names(field.types)
+    if (any(missing_types)) {
+      col_types[missing_types] <- dbDataType(conn, value[missing_types])
+    }
   }
 
   # Build column definitions
@@ -1372,8 +1621,8 @@ db_append_with_select_values <- function(conn, quoted_name, value) {
   db_sql_exec_and_wait(
     warehouse_id = conn@warehouse_id,
     statement = insert_sql,
-    catalog = if (nchar(conn@catalog) > 0) conn@catalog else NULL,
-    schema = if (nchar(conn@schema) > 0) conn@schema else NULL,
+    catalog = if (nzchar(conn@catalog)) conn@catalog else NULL,
+    schema = if (nzchar(conn@schema)) conn@schema else NULL,
     disposition = "INLINE",
     format = "JSON_ARRAY",
     wait_timeout = "10s",
@@ -1391,7 +1640,7 @@ db_should_use_volume_method <- function(
   temporary = FALSE
 ) {
   n_rows <- nrow(value)
-  has_volume <- !is.null(staging_volume) && nchar(staging_volume) > 0
+  has_volume <- !is.null(staging_volume) && nzchar(staging_volume)
 
   # Always use a staging volume if its specified, regardless of size
   if (has_volume) {
@@ -1563,7 +1812,7 @@ db_write_table_volume <- function(
       quoted_name,
       " AS SELECT * FROM READ_FILES('",
       volume_dataset_path,
-      "', format => 'parquet')"
+      "', format => 'parquet', schemaEvolutionMode => 'none')"
     )
   }
 
@@ -1571,8 +1820,8 @@ db_write_table_volume <- function(
   db_sql_exec_and_wait(
     warehouse_id = conn@warehouse_id,
     statement = copy_sql,
-    catalog = if (nchar(conn@catalog) > 0) conn@catalog else NULL,
-    schema = if (nchar(conn@schema) > 0) conn@schema else NULL,
+    catalog = if (nzchar(conn@catalog)) conn@catalog else NULL,
+    schema = if (nzchar(conn@schema)) conn@schema else NULL,
     disposition = "INLINE",
     format = "JSON_ARRAY",
     wait_timeout = "10s",
@@ -1589,8 +1838,8 @@ db_write_table_volume <- function(
 #' @param name Table name (character, Id, or SQL)
 #' @param value Data frame to append
 #' @param ... Additional arguments
-#' @param row.names If TRUE, preserve row names as a column
-#' @return TRUE invisibly on success
+#' @param row.names If `TRUE`, preserve row names as a column
+#' @return `TRUE` invisibly on success
 #' @export
 setMethod(
   "dbAppendTable",
@@ -1618,8 +1867,8 @@ setMethod(
 #' @param name Table name as Id object
 #' @param value Data frame to append
 #' @param ... Additional arguments
-#' @param row.names If TRUE, preserve row names as a column
-#' @return TRUE invisibly on success
+#' @param row.names If `TRUE`, preserve row names as a column
+#' @return `TRUE` invisibly on success
 #' @export
 setMethod(
   "dbAppendTable",

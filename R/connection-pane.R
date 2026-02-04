@@ -25,7 +25,7 @@ get_model_version_from_string <- function(x) {
 
 readable_time <- function(x) {
   time <- as.POSIXct(
-    x = x/1000,
+    x = x / 1000,
     origin = "1970-01-01",
     tz = "UTC"
   )
@@ -36,15 +36,17 @@ get_catalogs <- function(host, token) {
   catalogs <- db_uc_catalogs_list(host = host, token = token)
   data.frame(
     name = purrr::map_chr(catalogs, "name"),
-    type = "catalog"
+    type = "catalog",
+    check.names = FALSE
   )
   if (length(catalogs) > 0) {
     data.frame(
       name = purrr::map_chr(catalogs, "name"),
-      type = "catalog"
+      type = "catalog",
+      check.names = FALSE
     )
   } else {
-    data.frame(name = NULL, type = NULL)
+    data.frame(name = NULL, type = NULL, check.names = FALSE)
   }
 }
 
@@ -57,10 +59,11 @@ get_schemas <- function(catalog, host, token) {
   if (length(schemas) > 0) {
     data.frame(
       name = purrr::map_chr(schemas, "name"),
-      type = "schema"
+      type = "schema",
+      check.names = FALSE
     )
   } else {
-    data.frame(name = NULL, type = NULL)
+    data.frame(name = NULL, type = NULL, check.names = FALSE)
   }
 }
 
@@ -74,10 +77,11 @@ get_tables <- function(catalog, schema, host, token) {
   if (length(tables) > 0) {
     data.frame(
       name = purrr::map_chr(tables, "name"),
-      type = "table"
+      type = "table",
+      check.names = FALSE
     )
   } else {
-    data.frame(name = NULL, type = NULL)
+    data.frame(name = NULL, type = NULL, check.names = FALSE)
   }
 }
 
@@ -91,10 +95,11 @@ get_uc_models <- function(catalog, schema, host, token) {
   if (length(models) > 0) {
     data.frame(
       name = purrr::map_chr(models, "name"),
-      type = "model"
+      type = "model",
+      check.names = FALSE
     )
   } else {
-    data.frame(name = NULL, type = NULL)
+    data.frame(name = NULL, type = NULL, check.names = FALSE)
   }
 }
 
@@ -118,7 +123,8 @@ get_uc_model <- function(catalog, schema, model, host, token) {
 
   data.frame(
     name = names(info),
-    type = unname(unlist(info))
+    type = unname(unlist(info)),
+    check.names = FALSE
   )
 }
 
@@ -157,7 +163,8 @@ get_uc_model_versions <- function(catalog, schema, model, host, token,
 
     res <- data.frame(
       name = version_names,
-      type = "version"
+      type = "version",
+      check.names = FALSE
     )
 
   } else {
@@ -176,7 +183,8 @@ get_uc_model_versions <- function(catalog, schema, model, host, token,
 
     res <- data.frame(
       name = names(info),
-      type = unname(unlist(info))
+      type = unname(unlist(info)),
+      check.names = FALSE
     )
 
   }
@@ -195,10 +203,11 @@ get_uc_functions <- function(catalog, schema, host, token) {
   if (length(funcs) > 0) {
     data.frame(
       name = purrr::map_chr(funcs, "name"),
-      type = "func"
+      type = "func",
+      check.names = FALSE
     )
   } else {
-    data.frame(name = NULL, type = NULL)
+    data.frame(name = NULL, type = NULL, check.names = FALSE)
   }
 }
 
@@ -223,7 +232,8 @@ get_uc_function <- function(catalog, schema, func, host, token) {
 
   data.frame(
     name = names(info),
-    type = unname(unlist(info))
+    type = unname(unlist(info)),
+    check.names = FALSE
   )
 }
 
@@ -237,10 +247,11 @@ get_uc_volumes <- function(catalog, schema, host, token) {
   if (length(volumes) > 0) {
     data.frame(
       name = purrr::map_chr(volumes, "name"),
-      type = "volume"
+      type = "volume",
+      check.names = FALSE
     )
   } else {
-    data.frame(name = NULL, type = NULL)
+    data.frame(name = NULL, type = NULL, check.names = FALSE)
   }
 }
 
@@ -267,7 +278,8 @@ get_uc_volume <- function(catalog, schema, host, volume, token) {
 
   data.frame(
     name = names(info),
-    type = unname(unlist(info))
+    type = unname(unlist(info)),
+    check.names = FALSE
   )
 }
 
@@ -287,7 +299,8 @@ get_schema_objects <- function(catalog, schema, host, token) {
 
   data.frame(
     name = unname(sizes),
-    type = names(sizes)
+    type = names(sizes),
+    check.names = FALSE
   )
 
 }
@@ -302,7 +315,7 @@ get_table_data <- function(catalog, schema, table, host, token, metadata = TRUE)
     omit_properties = FALSE,
     omit_username = FALSE,
     host = host,
-    token = token,
+    token = token
   )
   # TODO: handle edge case errors?
   if (metadata) {
@@ -379,7 +392,8 @@ get_table_data <- function(catalog, schema, table, host, token, metadata = TRUE)
 
   data.frame(
     name = names(info),
-    type = unname(unlist(info))
+    type = unname(unlist(info)),
+    check.names = FALSE
   )
 
 }
@@ -390,7 +404,8 @@ get_experiments <- function(host, token) {
   exp_ids <-  purrr::map_chr(experiments, "experiment_id")
   data.frame(
     name = paste0(gsub(".*\\/(.*)", "\\1", exp_names), " (", exp_ids, ")"),
-    type = "experiment"
+    type = "experiment",
+    check.names = FALSE
   )
 }
 
@@ -409,7 +424,8 @@ get_experiment <- function(id, host, token) {
 
   data.frame(
     name = names(info),
-    type = unname(unlist(info))
+    type = unname(unlist(info)),
+    check.names = FALSE
   )
 }
 
@@ -423,7 +439,8 @@ get_models <- function(host, token) {
   models <- models$registered_models
   data.frame(
     name = purrr::map_chr(models, "name"),
-    type = "model"
+    type = "model",
+    check.names = FALSE
   )
 }
 
@@ -446,7 +463,8 @@ get_model_metadata <- function(id, host, token) {
 
   data.frame(
     name = names(info),
-    type = unname(unlist(info))
+    type = unname(unlist(info)),
+    check.names = FALSE
   )
 }
 
@@ -471,7 +489,8 @@ get_model_versions <- function(id, host, token, version = NULL) {
 
     res <- data.frame(
       name = version_names,
-      type = "version"
+      type = "version",
+      check.names = FALSE
     )
 
   } else {
@@ -491,7 +510,8 @@ get_model_versions <- function(id, host, token, version = NULL) {
 
     res <- data.frame(
       name = names(info),
-      type = unname(unlist(info))
+      type = unname(unlist(info)),
+      check.names = FALSE
     )
 
   }
@@ -521,13 +541,14 @@ get_cluster <- function(id, host, token) {
     "driver node type" = x$driver_node_type_id,
     "autotermination minutes" = x$autotermination_minutes,
     "start time" = readable_time(x$start_time),
-    "# workers" = ifelse(is.null(x$num_workers), 0L, x$num_workers),
-    "cores" = ifelse(is.null(x$cluster_cores), 0L, x$cluster_cores),
-    "memory (mb)" = ifelse(is.null(x$cluster_memory_mb), 0L, x$cluster_memory_mb)
+    "# workers" = x$num_workers %||% 0L,
+    "cores" = x$cluster_cores %||% 0L,
+    "memory (mb)" = x$cluster_memory_mb %||% 0L
   )
   data.frame(
     name = names(info),
-    type = unname(unlist(info))
+    type = unname(unlist(info)),
+    check.names = FALSE
   )
 }
 
@@ -557,7 +578,8 @@ get_warehouse <- function(id, host, token) {
   )
   data.frame(
     name = names(info),
-    type = unname(unlist(info))
+    type = unname(unlist(info)),
+    check.names = FALSE
   )
 }
 
@@ -607,7 +629,8 @@ list_objects <- function(host, token,
         if (!is.null(model)) {
           objects <- data.frame(
             name = c("metadata", "versions"),
-            type = c("metadata", "versions")
+            type = c("metadata", "versions"),
+            check.names = FALSE
           )
           return(objects)
         }
@@ -621,7 +644,8 @@ list_objects <- function(host, token,
         if (!is.null(table)) {
           objects <- data.frame(
             name = c("metadata", "columns"),
-            type = c("metadata", "columns")
+            type = c("metadata", "columns"),
+            check.names = FALSE
           )
           return(objects)
         }
@@ -663,7 +687,8 @@ list_objects <- function(host, token,
     if (!is.null(model)) {
       objects <- data.frame(
         name = c("metadata", "versions"),
-        type = c("metadata", "versions")
+        type = c("metadata", "versions"),
+        check.names = FALSE
       )
       return(objects)
     }
@@ -725,7 +750,8 @@ list_objects <- function(host, token,
 
   data.frame(
     name = names(info),
-    type = unname(unlist(info))
+    type = unname(unlist(info)),
+    check.names = FALSE
   )
 
 }
@@ -843,18 +869,18 @@ preview_object <- function(host, token, rowLimit,
 
   if (!is.null(catalog)) {
 
-    if (!is.null(catalog) & !is.null(schema) & !is.null(func)) {
+    if (!is.null(catalog) && !is.null(schema) && !is.null(func)) {
       path <- paste0(c("functions", catalog, schema, func), collapse = "/")
-    } else if (!is.null(catalog) & !is.null(schema) & !is.null(model) & !is.null(version)) {
+    } else if (!is.null(catalog) && !is.null(schema) && !is.null(model) && !is.null(version)) {
       version <- get_model_version_from_string(version)
       path <- paste0(c("models", catalog, schema, model, "version", version), collapse = "/")
-    } else if (!is.null(catalog) & !is.null(schema) & !is.null(model)) {
+    } else if (!is.null(catalog) && !is.null(schema) && !is.null(model)) {
       path <- paste0(c("models", catalog, schema, model), collapse = "/")
-    } else if (!is.null(catalog) & !is.null(schema) & !is.null(volume)) {
+    } else if (!is.null(catalog) && !is.null(schema) && !is.null(volume)) {
       path <- paste0(c("volumes", catalog, schema, volume), collapse = "/")
-    } else if (!is.null(catalog) & !is.null(schema) & !is.null(table)) {
+    } else if (!is.null(catalog) && !is.null(schema) && !is.null(table)) {
       path <- paste0(c(catalog, schema, table), collapse = "/")
-    } else if (!is.null(catalog) & !is.null(schema)) {
+    } else if (!is.null(catalog) && !is.null(schema)) {
       path <- paste0(c(catalog, schema), collapse = "/")
     } else {
       path <- catalog

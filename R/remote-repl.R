@@ -81,7 +81,7 @@ db_context_manager <- R6::R6Class(
     #' @return Command results
     cmd_run = function(cmd, language = c("r", "py", "scala", "sql", "sh")) {
       language <- match.arg(language)
-      code = paste(cmd, collapse = "\n")
+      code <- paste(cmd, collapse = "\n")
 
       if (language == "sh") {
         cmd <- paste0("%%sh\n", cmd)
@@ -174,7 +174,7 @@ db_repl <- function(
 
       if (inherits(parsed, "try-error")) {
         # incomplete R block? keep reading
-        if (grepl("unexpected end of input", parsed[1])) {
+        if (grepl("unexpected end of input", parsed[1], fixed = TRUE)) {
           next
         }
         # real syntax error: show it, reset buffer

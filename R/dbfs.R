@@ -65,7 +65,7 @@ db_dbfs_create <- function(
 #' @param data Either a path for file on local system or a character/raw
 #' vector that will be base64-encoded. This has a limit of 1 MB.
 #' @param convert_to_raw Boolean (Default: `FALSE`), if `TRUE` will convert
-#' character vector to raw via [base::as.raw()].
+#' character vector to raw via [as.raw()].
 #' @inheritParams auth_params
 #' @inheritParams db_sql_warehouse_create
 #'
@@ -108,10 +108,10 @@ db_dbfs_add_block <- function(
   obj_size <- round(as.integer(object.size(encoded_data)) / 1024^2, 4)
 
   if (obj_size > 1L) {
-    stop(cli::format_error(c(
+    cli::cli_abort(c(
       "Max Block Size Exceeded:",
       "x" = "Maximum block size is 1MB, block was {obj_size}MB."
-    )))
+    ))
   }
 
   body <- list(
@@ -453,14 +453,14 @@ db_dbfs_put <- function(
   # file takes priority, so don't bother if file is also specified
   if (!is.null(contents) && is.null(file)) {
     # contents must be base64 encoded string
-    body$contents <- base64enc::base64encode(base::charToRaw(contents))
+    body$contents <- base64enc::base64encode(charToRaw(contents))
   } else if (!is.null(file)) {
     body$contents <- curl::form_file(path = file)
   } else {
-    stop(cli::format_error(c(
+    cli::cli_abort(c(
       "Nothing to upload:",
-      "x" = "Either `file` or `contents` must be specified."
-    )))
+      "x" = "Either {.arg file} or {.arg contents} must be specified."
+    ))
   }
 
   req <- db_request(

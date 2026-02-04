@@ -260,7 +260,7 @@ db_sql_exec_result <- function(
 #'
 #' @inheritParams db_sql_exec_cancel
 #' @param interval Number of seconds between status checks.
-#' @param show_progress If TRUE, show progress updates during polling (default: TRUE)
+#' @param show_progress If `TRUE`, show progress updates during polling (default: `TRUE`)
 db_sql_exec_poll_for_success <- function(
   statement_id,
   interval = 1,
@@ -271,7 +271,6 @@ db_sql_exec_poll_for_success <- function(
   is_query_running <- TRUE
 
   while (is_query_running) {
-    Sys.sleep(interval)
     status <- db_sql_exec_status(
       statement_id = statement_id,
       host = host,
@@ -288,6 +287,8 @@ db_sql_exec_poll_for_success <- function(
         error_msg <- paste("Query failed with status:", status$status$state)
       }
       cli::cli_abort(error_msg)
+    } else {
+      Sys.sleep(interval)
     }
   }
 
@@ -354,6 +355,7 @@ db_sql_exec_and_wait <- function(
     }
     resp <- db_sql_exec_poll_for_success(
       resp$statement_id,
+      interval = 0.1,
       show_progress = FALSE,
       host = host,
       token = token
@@ -462,20 +464,122 @@ db_sql_create_empty_result <- function(manifest) {
 #' Internal helper that fetches and processes results from a completed query.
 #' Handles Arrow stream processing and data conversion.
 #'
-#' @param statement_id Query statement ID
-#' @param manifest Query result manifest from status response
+#' @param resp Query status response from SQL execution
 #' @param return_arrow Boolean, return arrow Table instead of tibble
 #' @param max_active_connections Integer for concurrent downloads
 #' @param fetch_timeout Integer, timeout in seconds for downloading each result chunk
 #' @param row_limit Integer, limit number of rows returned (applied after fetch)
 #' @param host Databricks host
 #' @param token Databricks token
-#' @param show_progress If TRUE, show progress updates during result fetching (default: TRUE)
+#' @param show_progress If `TRUE`, show progress updates during result fetching (default: `TRUE`)
 #' @returns tibble or arrow Table with query results
 #' @keywords internal
 db_sql_fetch_results <- function(
+  resp,
+  return_arrow = FALSE,
+  max_active_connections = 30,
+  fetch_timeout = 300,
+  row_limit = NULL,
+  host = db_host(),
+  token = db_token(),
+  show_progress = TRUE
+) {
+  manifest <- resp$manifest
+  statement_id <- resp$statement_id
+  total_chunks <- manifest$total_chunk_count
+
+  if (total_chunks == 1) {
+    res <- db_sql_fetch_results_fast(
+      resp = resp,
+      statement_id = statement_id,
+      manifest = manifest,
+      return_arrow = return_arrow,
+      fetch_timeout = fetch_timeout,
+      row_limit = row_limit,
+      host = host,
+      token = token,
+      show_progress = show_progress
+    )
+    return(res)
+  }
+
+  db_sql_fetch_results_parallel(
+    statement_id = statement_id,
+    manifest = manifest,
+    last_chunk_index = total_chunks - 1L,
+    return_arrow = return_arrow,
+    max_active_connections = max_active_connections,
+    fetch_timeout = fetch_timeout,
+    row_limit = row_limit,
+    host = host,
+    token = token,
+    show_progress = show_progress
+  )
+}
+
+#' Fetch SQL Query Results (Fast Path)
+#'
+#' @keywords internal
+db_sql_fetch_results_fast <- function(
+  resp,
   statement_id,
   manifest,
+  return_arrow = FALSE,
+  fetch_timeout = 300,
+  row_limit = NULL,
+  host = db_host(),
+  token = db_token(),
+  show_progress = TRUE
+) {
+  if (show_progress) {
+    total_rows <- manifest$total_row_count
+    cli::cli_progress_step(
+      "Fetching {cli::no(total_rows)} rows",
+      "Downloaded {cli::no(total_rows)} rows"
+    )
+  }
+
+  link <- resp$result$external_links[[1]]$external_link
+
+  req <- httr2::request(link) |>
+    httr2::req_retry(max_tries = 3, backoff = ~1)
+
+  if (!is.null(fetch_timeout)) {
+    req <- httr2::req_timeout(req, fetch_timeout)
+  }
+
+  ipc_resp <- httr2::req_perform(req)
+
+  if (show_progress) {
+    cli::cli_progress_done()
+    cli::cli_progress_step("Processing results")
+  }
+
+  if (rlang::is_installed("arrow")) {
+    results <- arrow::read_ipc_stream(ipc_resp$body, as_data_frame = FALSE)
+    if (!return_arrow) {
+      results <- tibble::as_tibble(results)
+    }
+  } else {
+    results <- tibble::as_tibble(nanoarrow::read_nanoarrow(ipc_resp$body))
+  }
+
+  cli::cli_progress_done()
+
+  if (!is.null(row_limit) && row_limit > 0 && nrow(results) > row_limit) {
+    results <- results[1:row_limit, ]
+  }
+
+  results
+}
+
+#' Fetch SQL Query Results (Parallel Path)
+#'
+#' @keywords internal
+db_sql_fetch_results_parallel <- function(
+  statement_id,
+  manifest,
+  last_chunk_index,
   return_arrow = FALSE,
   max_active_connections = 30,
   fetch_timeout = 300,
@@ -493,13 +597,9 @@ db_sql_fetch_results <- function(
     )
   }
 
-  # This function only handles external links disposition
-  # Get chunk information (empty handling done upstream)
-  total_chunks <- manifest$total_chunk_count - 1
-
   # Create requests for all result chunks
   reqs <- purrr::map(
-    .x = seq.int(total_chunks, from = 0),
+    .x = seq.int(last_chunk_index, from = 0),
     .f = db_sql_exec_result,
     statement_id = statement_id,
     host = host,
@@ -580,7 +680,7 @@ db_sql_fetch_results <- function(
 #' @param max_active_connections Integer to decide on concurrent downloads.
 #' @param fetch_timeout Integer, timeout in seconds for downloading each result chunk
 #' @param disposition Disposition mode ("INLINE" or "EXTERNAL_LINKS")
-#' @param show_progress If TRUE, show progress updates during query execution (default: TRUE)
+#' @param show_progress If `TRUE`, show progress updates during query execution (default: `TRUE`)
 #' @returns [tibble::tibble] or [arrow::Table].
 #' @export
 db_sql_query <- function(
@@ -591,6 +691,7 @@ db_sql_query <- function(
   parameters = NULL,
   row_limit = NULL,
   byte_limit = NULL,
+  wait_timeout = "5s",
   return_arrow = FALSE,
   max_active_connections = 30,
   fetch_timeout = 300,
@@ -611,7 +712,7 @@ db_sql_query <- function(
     parameters = parameters,
     row_limit = row_limit,
     byte_limit = byte_limit,
-    wait_timeout = "0s",
+    wait_timeout = wait_timeout,
     disposition = disposition,
     format = format,
     host = host,
@@ -636,8 +737,7 @@ db_sql_query <- function(
   } else {
     # Use external links processor for ARROW_STREAM results
     db_sql_fetch_results(
-      statement_id = resp$statement_id,
-      manifest = resp$manifest,
+      resp = resp,
       return_arrow = return_arrow,
       max_active_connections = max_active_connections,
       fetch_timeout = fetch_timeout,

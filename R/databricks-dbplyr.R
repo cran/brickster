@@ -53,7 +53,7 @@ sql_table_analyze.DatabricksConnection <- function(con, table, ...) {
 # Table Operations ---------------------------------------------------------------
 
 #' Generate unique temporary table/view name
-#' @param prefix Base name prefix (default: "dbplyr_temp")
+#' @param prefix Base name prefix (default: `"dbplyr_temp"`)
 #' @return Unique temporary name
 #' @keywords internal
 generate_temp_name <- function(prefix = "dbplyr_temp") {
@@ -69,7 +69,7 @@ generate_temp_name <- function(prefix = "dbplyr_temp") {
 #' @param con A DatabricksConnection object
 #' @param sql SQL query to save as table/view
 #' @param name Name for the temporary view or table
-#' @param temporary Whether the object should be temporary (default: TRUE)
+#' @param temporary Whether the object should be temporary (default: `TRUE`)
 #' @param ... Additional arguments (ignored)
 #' @return The table/view name (invisibly)
 #' @export
@@ -85,54 +85,52 @@ sql_query_save.DatabricksConnection <- function(
   if (!DBI::dbIsValid(con)) {
     cli::cli_abort("Connection is not valid")
   }
-  
-  if (missing(name) || is.null(name) || nchar(trimws(name)) == 0) {
+
+  if (missing(name) || is.null(name) || !nzchar(trimws(name))) {
     cli::cli_abort("Table/view name must be provided and non-empty")
   }
-  
-  if (missing(sql) || is.null(sql) || nchar(trimws(as.character(sql))) == 0) {
+
+  if (missing(sql) || is.null(sql) || !nzchar(trimws(as.character(sql)))) {
     cli::cli_abort("SQL query must be provided and non-empty")
   }
-  
+
   # For user-provided names, ensure uniqueness to avoid conflicts
   # Don't modify dbplyr-generated names (they start with dbplyr_)
-  if (temporary && is.character(name) && !grepl("^dbplyr_", name) && nchar(trimws(name)) > 0) {
+  if (temporary && is.character(name) && !grepl("^dbplyr_", name) && nzchar(trimws(name))) {
     name <- generate_temp_name(name)
   }
-  
+
   # Create appropriate SQL based on temporary flag
   if (temporary) {
     # Use TEMPORARY VIEW for session-scoped objects
-    if (is.character(name) && grepl("^`.*`$", name)) {
-      quoted_name <- name  # Already quoted
+    if (inherits(name, "SQL") || (is.character(name) && grepl("^`.*`$", name))) {
+      quoted_name <- name  # Already quoted / literal
     } else {
       quoted_name <- DBI::dbQuoteIdentifier(con, name)
     }
     create_sql <- paste0(
-      "CREATE OR REPLACE TEMPORARY VIEW ", 
-      quoted_name, 
-      " AS ", 
+      "CREATE OR REPLACE TEMPORARY VIEW ",
+      quoted_name,
+      " AS ",
       as.character(sql)
     )
   } else {
     # Use regular table for persistent objects
-    if (is.character(name) && grepl("^`.*`$", name)) {
-      quoted_name <- name  # Already quoted
+    if (inherits(name, "SQL") || (is.character(name) && grepl("^`.*`$", name))) {
+      quoted_name <- name  # Already quoted / literal
     } else {
       quoted_name <- DBI::dbQuoteIdentifier(con, name)
     }
     create_sql <- paste0(
-      "CREATE OR REPLACE TABLE ", 
-      quoted_name, 
-      " AS ", 
+      "CREATE OR REPLACE TABLE ",
+      quoted_name,
+      " AS ",
       as.character(sql)
     )
   }
-  
-  # Execute the creation SQL
-  DBI::dbExecute(con, create_sql)
-  
-  invisible(name)
+
+  # Return SQL only; dbplyr handles execution.
+  create_sql
 }
 
 
@@ -164,7 +162,7 @@ sql_query_fields.DatabricksConnection <- function(con, sql, ...) {
 #' @param df Data frame to copy
 #' @param name Name for the table/view
 #' @param overwrite Whether to overwrite existing table/view
-#' @param temporary Whether to create as temporary view (default: TRUE, but NOT SUPPORTED - will error)
+#' @param temporary Whether to create as temporary view (default: `TRUE`, but NOT SUPPORTED - will error)
 #' @param ... Additional arguments passed to dbWriteTable
 #' @return dbplyr table reference
 #' @details Note: temporary=TRUE will result in an error as temporary tables are not
@@ -557,8 +555,7 @@ db_collect.DatabricksConnection <- function(con, sql, n = -1, warn_incomplete = 
   if (n > 0 && nrow(out) > n) {
     out <- out[1:n, ]
     if (warn_incomplete) {
-      warning("Only first ", n, " results retrieved. Use n = -1 to retrieve all.",
-              call. = FALSE)
+      cli::cli_warn("Only first {n} results retrieved. Use {.code n = -1} to retrieve all.")
     }
   }
   
