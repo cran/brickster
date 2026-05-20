@@ -14,6 +14,7 @@
 #' @family SQL Queries API
 #'
 #' @export
+#' @returns If `perform_request = TRUE`, returns endpoint-specific API output. If `FALSE`, returns an `httr2_request`.
 db_query_list <- function(
   page_size = 20,
   page_token = NULL,
@@ -64,6 +65,7 @@ db_query_list <- function(
 #' @family SQL Queries API
 #'
 #' @export
+#' @returns If `perform_request = TRUE`, returns endpoint-specific API output. If `FALSE`, returns an `httr2_request`.
 db_query_create <- function(
   warehouse_id,
   query_text,
@@ -124,6 +126,7 @@ db_query_create <- function(
 #' @family SQL Queries API
 #'
 #' @export
+#' @returns If `perform_request = TRUE`, returns endpoint-specific API output. If `FALSE`, returns an `httr2_request`.
 db_query_get <- function(
   id,
   host = db_host(),
@@ -155,6 +158,7 @@ db_query_get <- function(
 #' @family SQL Queries API
 #'
 #' @export
+#' @returns If `perform_request = TRUE`, returns endpoint-specific API output. If `FALSE`, returns an `httr2_request`.
 db_query_update <- function(
   id,
   warehouse_id = NULL,
@@ -187,7 +191,7 @@ db_query_update <- function(
     tags = tags
   )
   # keep non-null values
-  body$query <- Filter(length, query)
+  body$query <- purrr::compact(query)
   # dynamically generate update mask
   body$update_mask <- paste(names(body$query), collapse = ",")
 
@@ -221,6 +225,7 @@ db_query_update <- function(
 #' @family SQL Queries API
 #'
 #' @export
+#' @returns If `perform_request = TRUE`, returns endpoint-specific API output. If `FALSE`, returns an `httr2_request`.
 db_query_delete <- function(
   id,
   host = db_host(),

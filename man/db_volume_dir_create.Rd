@@ -22,6 +22,9 @@ slash.}
 \item{perform_request}{If \code{TRUE} (default) the request is performed, if
 \code{FALSE} the httr2 request is returned \emph{without} being performed.}
 }
+\value{
+If \code{perform_request = TRUE}, returns endpoint-specific API output. If \code{FALSE}, returns an \code{httr2_request}.
+}
 \description{
 Volume FileSystem Create Directory
 }
@@ -30,6 +33,7 @@ Other Volumes FileSystem API:
 \code{\link{db_volume_delete}()},
 \code{\link{db_volume_dir_delete}()},
 \code{\link{db_volume_dir_exists}()},
+\code{\link{db_volume_download_dir}()},
 \code{\link{db_volume_file_exists}()},
 \code{\link{db_volume_list}()},
 \code{\link{db_volume_read}()},

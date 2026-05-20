@@ -32,6 +32,9 @@ existing files.}
 
 \item{progress}{If \code{TRUE}, show progress bar for file operations (default: \code{TRUE} for uploads/downloads, \code{FALSE} for other operations)}
 }
+\value{
+If \code{perform_request = TRUE}, returns endpoint-specific API output. If \code{FALSE}, returns an \code{httr2_request}.
+}
 \description{
 Upload a file to volume filesystem.
 }
@@ -44,6 +47,7 @@ Other Volumes FileSystem API:
 \code{\link{db_volume_dir_create}()},
 \code{\link{db_volume_dir_delete}()},
 \code{\link{db_volume_dir_exists}()},
+\code{\link{db_volume_download_dir}()},
 \code{\link{db_volume_file_exists}()},
 \code{\link{db_volume_list}()},
 \code{\link{db_volume_read}()},

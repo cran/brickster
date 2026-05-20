@@ -38,6 +38,7 @@
 #' @family Warehouse API
 #'
 #' @export
+#' @returns If `perform_request = TRUE`, returns endpoint-specific API output. If `FALSE`, returns an `httr2_request`.
 db_sql_warehouse_create <- function(
   name,
   cluster_size,
@@ -111,6 +112,7 @@ db_sql_warehouse_create <- function(
 #' @family Warehouse API
 #'
 #' @export
+#' @returns If `perform_request = TRUE`, returns endpoint-specific API output. If `FALSE`, returns an `httr2_request`.
 db_sql_warehouse_delete <- function(
   id,
   host = db_host(),
@@ -144,6 +146,7 @@ db_sql_warehouse_delete <- function(
 #' @family Warehouse API
 #'
 #' @export
+#' @returns If `perform_request = TRUE`, returns endpoint-specific API output. If `FALSE`, returns an `httr2_request`.
 db_sql_warehouse_edit <- function(
   id,
   name = NULL,
@@ -224,6 +227,8 @@ db_sql_warehouse_edit <- function(
 #' @family Warehouse API
 #'
 #' @export
+#' @returns If `perform_request = TRUE`, returns a nested list with class
+#'   `db_sql_warehouse`. If `FALSE`, returns an `httr2_request`.
 db_sql_warehouse_get <- function(
   id,
   host = db_host(),
@@ -239,7 +244,8 @@ db_sql_warehouse_get <- function(
   )
 
   if (perform_request) {
-    db_perform_request(req)
+    warehouse <- db_perform_request(req)
+    new_db_sql_warehouse(warehouse)
   } else {
     req
   }
@@ -253,6 +259,9 @@ db_sql_warehouse_get <- function(
 #' @family Warehouse API
 #'
 #' @export
+#' @returns If `perform_request = TRUE`, returns a nested list of warehouses
+#'   with class `db_sql_warehouse_list`; each element has class
+#'   `db_sql_warehouse`. If `FALSE`, returns an `httr2_request`.
 db_sql_warehouse_list <- function(
   host = db_host(),
   token = db_token(),
@@ -268,7 +277,8 @@ db_sql_warehouse_list <- function(
   )
 
   if (perform_request) {
-    db_perform_request(req)$warehouses
+    warehouses <- db_perform_request(req)$warehouses
+    new_db_sql_warehouse_list(warehouses)
   } else {
     req
   }
@@ -283,6 +293,7 @@ db_sql_warehouse_list <- function(
 #' @family Warehouse API
 #'
 #' @export
+#' @returns If `perform_request = TRUE`, returns endpoint-specific API output. If `FALSE`, returns an `httr2_request`.
 db_sql_warehouse_start <- function(
   id,
   host = db_host(),
@@ -313,6 +324,7 @@ db_sql_warehouse_start <- function(
 #' @family Warehouse API
 #'
 #' @export
+#' @returns If `perform_request = TRUE`, returns endpoint-specific API output. If `FALSE`, returns an `httr2_request`.
 db_sql_warehouse_stop <- function(
   id,
   host = db_host(),
@@ -342,6 +354,7 @@ db_sql_warehouse_stop <- function(
 #' @family Warehouse API
 #'
 #' @export
+#' @returns If `perform_request = TRUE`, returns endpoint-specific API output. If `FALSE`, returns an `httr2_request`.
 db_sql_global_warehouse_get <- function(
   host = db_host(),
   token = db_token(),
@@ -378,7 +391,7 @@ db_sql_global_warehouse_get <- function(
 #' @family Warehouse API
 #' @family Warehouse Helpers
 #'
-#' @return `db_sql_warehouse_get()`
+#' @returns `db_sql_warehouse_get()`
 #' @export
 get_and_start_warehouse <- function(
   id,
@@ -413,4 +426,152 @@ get_and_start_warehouse <- function(
   }
 
   warehouse_status
+}
+
+new_db_sql_warehouse <- function(x) {
+  stopifnot(is.list(x))
+  class(x) <- unique(c("db_sql_warehouse", class(x)))
+  x
+}
+
+new_db_sql_warehouse_list <- function(x) {
+  if (is.null(x)) {
+    x <- list()
+  }
+
+  stopifnot(is.list(x))
+  warehouses <- purrr::map(x, new_db_sql_warehouse)
+  class(warehouses) <- unique(c("db_sql_warehouse_list", class(warehouses)))
+  warehouses
+}
+
+warehouse_scalar_chr <- function(x, field, default = NA_character_) {
+  value <- x[[field]]
+  if (is.null(value) || length(value) == 0) {
+    return(default)
+  }
+
+  as.character(value[[1]])
+}
+
+warehouse_cluster_count_chr <- function(x, default = NA_character_) {
+  min_clusters <- warehouse_scalar_chr(x, "min_num_clusters")
+  max_clusters <- warehouse_scalar_chr(x, "max_num_clusters")
+
+  if (is.na(min_clusters) && is.na(max_clusters)) {
+    return(default)
+  }
+
+  if (is.na(min_clusters)) {
+    return(max_clusters)
+  }
+
+  if (is.na(max_clusters)) {
+    return(min_clusters)
+  }
+
+  if (identical(min_clusters, max_clusters)) {
+    return(min_clusters)
+  }
+
+  paste0(min_clusters, "-", max_clusters)
+}
+
+warehouse_scaling_label <- function(
+  x,
+  default = "<unset>",
+  current_default = "?"
+) {
+  cluster_range <- warehouse_cluster_count_chr(x, default = default)
+  if (identical(cluster_range, default)) {
+    return(default)
+  }
+
+  current_clusters <- warehouse_scalar_chr(
+    x,
+    "num_clusters",
+    default = current_default
+  )
+
+  paste0("[", current_clusters, "/", cluster_range, "]")
+}
+
+warehouse_state_colored <- function(x, default = "<unset>") {
+  state <- warehouse_scalar_chr(x, "state", default = default)
+  if (identical(state, default)) {
+    return(state)
+  }
+
+  if (state %in% c("RUNNING")) {
+    return(cli::col_green(state))
+  }
+
+  if (state %in% c("STARTING", "SCALING_UP", "SCALING_DOWN")) {
+    return(cli::col_yellow(state))
+  }
+
+  if (state %in% c("STOPPED", "STOPPING", "DELETED")) {
+    return(cli::col_red(state))
+  }
+
+  cli::col_blue(state)
+}
+
+warehouse_type_label <- function(x, default = "<unset>") {
+  if (isTRUE(x[["enable_serverless_compute"]])) {
+    return("Serverless")
+  }
+
+  warehouse_type <- warehouse_scalar_chr(x, "warehouse_type", default = default)
+  if (identical(warehouse_type, default)) {
+    return(default)
+  }
+
+  warehouse_type_upper <- toupper(warehouse_type)
+  if (identical(warehouse_type_upper, "PRO")) {
+    return("Pro")
+  }
+
+  if (identical(warehouse_type_upper, "CLASSIC")) {
+    return("Classic")
+  }
+
+  warehouse_type
+}
+
+#' @export
+#' @method print db_sql_warehouse
+#' @noRd
+print.db_sql_warehouse <- function(x, ...) {
+  warehouse_name <- warehouse_scalar_chr(x, "name", default = "<unset>")
+  warehouse_id <- warehouse_scalar_chr(x, "id", default = "<unset>")
+  warehouse_type <- warehouse_type_label(x, default = "<unset>")
+  cluster_size <- warehouse_scalar_chr(x, "cluster_size", default = "<unset>")
+  cluster_count <- warehouse_scaling_label(x, default = "<unset>")
+  warehouse_state <- warehouse_state_colored(x, default = "<unset>")
+  id_label <- cli::col_grey(warehouse_id)
+  type_label <- cli::col_cyan(warehouse_type)
+  size_label <- cli::col_cyan(cluster_size)
+  scaling_label <- cli::col_yellow(cluster_count)
+  size_with_scaling <- if (identical(cluster_count, "<unset>")) {
+    size_label
+  } else {
+    paste0(size_label, " ", scaling_label)
+  }
+
+  cat(cli::style_bold(cli::col_cyan("warehouse")), " ", id_label, "\n", sep = "")
+  cat("  ", warehouse_name, "\n", sep = "")
+  cat("  Type: ", type_label, "\n", sep = "")
+  cat("  Size: ", size_with_scaling, "\n", sep = "")
+  cat("  State: ", warehouse_state, "\n", sep = "")
+
+  invisible(x)
+}
+
+#' @export
+#' @method print db_sql_warehouse_list
+#' @noRd
+print.db_sql_warehouse_list <- function(x, ...) {
+  print(unclass(x), ...)
+  invisible(x)
 }

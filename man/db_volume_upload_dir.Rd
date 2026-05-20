@@ -8,7 +8,7 @@ db_volume_upload_dir(
   local_dir,
   volume_dir,
   overwrite = TRUE,
-  preserve_structure = TRUE,
+  recursive = TRUE,
   host = db_host(),
   token = db_token()
 )
@@ -20,7 +20,8 @@ db_volume_upload_dir(
 
 \item{overwrite}{Flag to overwrite existing files (default: \code{TRUE})}
 
-\item{preserve_structure}{If \code{TRUE}, preserve subdirectory structure (default: \code{TRUE})}
+\item{recursive}{If \code{TRUE}, recursively include subdirectories (default: \code{TRUE}).
+If \code{FALSE}, only top-level files are transferred.}
 
 \item{host}{Databricks workspace URL, defaults to calling \code{\link[=db_host]{db_host()}}.}
 
@@ -38,6 +39,7 @@ Other Volumes FileSystem API:
 \code{\link{db_volume_dir_create}()},
 \code{\link{db_volume_dir_delete}()},
 \code{\link{db_volume_dir_exists}()},
+\code{\link{db_volume_download_dir}()},
 \code{\link{db_volume_file_exists}()},
 \code{\link{db_volume_list}()},
 \code{\link{db_volume_read}()},

@@ -12,7 +12,7 @@
 #'
 #' @family Request Helpers
 #'
-#' @return request
+#' @returns request
 #' @import httr2
 db_request <- function(
   endpoint,
@@ -40,7 +40,7 @@ db_request <- function(
     httr2::req_user_agent(string = user_agent_str) |>
     httr2::req_url_path_append(endpoint) |>
     httr2::req_method(method) |>
-    httr2::req_retry(max_tries = 3, backoff = ~2)
+    httr2::req_retry(max_tries = 3, backoff = ~2, retry_on_failure = TRUE)
 
   # if token is present use directly
   # otherwise initiate OAuth 2.0 U2M or M2M Workspace flow
@@ -57,14 +57,15 @@ db_request <- function(
       req <- httr2::req_oauth_client_credentials(
         req,
         client = oauth_client$client,
-        scope = "all-apis"
+        scope = oauth_client$scope,
+        token_params = oauth_client$token_params
       )
     } else if (!is_hosted_session() && rlang::is_interactive()) {
       # use client to auth
       req <- httr2::req_oauth_auth_code(
         req,
         client = oauth_client$client,
-        scope = "all-apis",
+        scope = oauth_client$scope,
         auth_url = oauth_client$auth_url,
         redirect_uri = "http://localhost:8020"
       )
@@ -74,7 +75,7 @@ db_request <- function(
   }
 
   if (!is.null(body)) {
-    body <- Filter(length, body)
+    body <- purrr::compact(body)
     req <- req |>
       httr2::req_body_json(body, ...)
   }
@@ -113,11 +114,23 @@ db_perform_request <- function(req, ...) {
     httr2::resp_body_json(...)
 }
 
+#' Perform Databricks API Request and Return Response
+#'
+#' @param req `{httr2}` request.
+#' @param ... Parameters passed to [httr2::req_perform()]
+#'
+#' @family Request Helpers
+db_perform_response <- function(req, ...) {
+  req |>
+    httr2::req_error(body = db_req_error_body) |>
+    httr2::req_perform(...)
+}
+
 #' Generate Request JSON
 #'
 #' @param req a httr2 request, ideally from [db_request()].
 #'
-#' @return JSON string
+#' @returns JSON string
 #'
 #' @family Request Helpers
 #' @export

@@ -21,6 +21,10 @@ db_jobs_get(
 \item{perform_request}{If \code{TRUE} (default) the request is performed, if
 \code{FALSE} the httr2 request is returned \emph{without} being performed.}
 }
+\value{
+If \code{perform_request = TRUE}, returns a nested list with class
+\code{db_job}. If \code{FALSE}, returns an \code{httr2_request}.
+}
 \description{
 Get Job Details
 }

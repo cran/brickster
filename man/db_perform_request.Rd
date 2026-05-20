@@ -16,6 +16,7 @@ Perform Databricks API Request
 }
 \seealso{
 Other Request Helpers: 
+\code{\link{db_perform_response}()},
 \code{\link{db_req_error_body}()},
 \code{\link{db_request}()},
 \code{\link{db_request_json}()}

@@ -5,7 +5,7 @@ test_that("Libraries API - don't perform", {
   ))
 
   resp_all_statuses <- db_libs_all_cluster_statuses(
-    perform_request = F
+    perform_request = FALSE
   )
   expect_s3_class(resp_all_statuses, "httr2_request")
 
@@ -13,7 +13,7 @@ test_that("Libraries API - don't perform", {
     db_libs_install(
       cluster_id = "some_cluster_id",
       libraries = "pandas",
-      perform_request = F
+      perform_request = FALSE
     )
   })
   resp_lib_install <- db_libs_install(
@@ -21,13 +21,13 @@ test_that("Libraries API - don't perform", {
     libraries = libraries(
       lib_pypi("pandas")
     ),
-    perform_request = F
+    perform_request = FALSE
   )
   expect_s3_class(resp_lib_install, "httr2_request")
 
   resp_lib_status <- db_libs_cluster_status(
     cluster_id = "some_cluster_id",
-    perform_request = F
+    perform_request = FALSE
   )
   expect_s3_class(resp_lib_status, "httr2_request")
 
@@ -35,7 +35,7 @@ test_that("Libraries API - don't perform", {
     db_libs_uninstall(
       cluster_id = "some_cluster_id",
       libraries = "pandas",
-      perform_request = F
+      perform_request = FALSE
     )
   })
   resp_lib_uninstall <- db_libs_uninstall(
@@ -43,7 +43,7 @@ test_that("Libraries API - don't perform", {
     libraries = libraries(
       lib_pypi("pandas")
     ),
-    perform_request = F
+    perform_request = FALSE
   )
   expect_s3_class(resp_lib_status, "httr2_request")
 })
@@ -66,7 +66,7 @@ test_that("Libraries API", {
     purrr::map_chr(resp_list_dbrv$versions, "key"),
     decreasing = TRUE
   )
-  std_runtimes <- purrr::keep(runtimes, ~ !grepl("photon|gpu", .x))
+  std_runtimes <- purrr::keep(runtimes, \(x) !grepl("photon|gpu", x))
   resp_create_cluster <- db_cluster_create(
     name = "brickster_test_libraries_cluster",
     spark_version = std_runtimes[1],

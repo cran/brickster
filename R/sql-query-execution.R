@@ -73,6 +73,7 @@
 #' @family SQL Execution APIs
 #'
 #' @export
+#' @returns If `perform_request = TRUE`, returns endpoint-specific API output. If `FALSE`, returns an `httr2_request`.
 db_sql_exec_query <- function(
   statement,
   warehouse_id,
@@ -138,6 +139,7 @@ db_sql_exec_query <- function(
 #' @family SQL Execution APIs
 #'
 #' @export
+#' @returns If `perform_request = TRUE`, returns endpoint-specific API output. If `FALSE`, returns an `httr2_request`.
 db_sql_exec_cancel <- function(
   statement_id,
   host = db_host(),
@@ -182,6 +184,7 @@ db_sql_exec_cancel <- function(
 #' @family SQL Execution APIs
 #'
 #' @export
+#' @returns If `perform_request = TRUE`, returns endpoint-specific API output. If `FALSE`, returns an `httr2_request`.
 db_sql_exec_status <- function(
   statement_id,
   host = db_host(),
@@ -229,6 +232,7 @@ db_sql_exec_status <- function(
 #' @family SQL Execution APIs
 #'
 #' @export
+#' @returns If `perform_request = TRUE`, returns endpoint-specific API output. If `FALSE`, returns an `httr2_request`.
 db_sql_exec_result <- function(
   statement_id,
   chunk_index,
@@ -612,7 +616,7 @@ db_sql_fetch_results_parallel <- function(
 
   links <- resps |>
     purrr::map(httr2::resp_body_json) |>
-    purrr::map_chr(~ .x$external_links[[1]]$external_link) |>
+    purrr::map_chr(\(x) x$external_links[[1]]$external_link) |>
     purrr::map(function(link) {
       req <- httr2::request(link) |>
         httr2::req_retry(max_tries = 3, backoff = ~1)

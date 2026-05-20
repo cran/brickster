@@ -48,9 +48,8 @@ overflow: visible;
 }
 </style>
 <style type="text/css" data-origin="pandoc">
-html { -webkit-text-size-adjust: 100%; }
 pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span { line-height: 1.25; }
 pre > code.sourceCode > span:empty { height: 1.2em; }
 .sourceCode { overflow: visible; }
 code.sourceCode > span { color: inherit; text-decoration: inherit; }
@@ -61,7 +60,7 @@ div.sourceCode { overflow: auto; }
 }
 @media print {
 pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
 }
 pre.numberSource code
 { counter-reset: source-line 0; }
@@ -379,6 +378,17 @@ required if using OAuth U2M or M2M</em>)</p></li>
 required for OAuth M2M</em>)</p></li>
 <li><p><code>DATABRICKS_CLIENT_SECRET</code>: OAuth M2M client secret
 (<em>only required for OAuth M2M</em>)</p></li>
+<li><p><code>ARM_CLIENT_ID</code>: Azure AD service principal
+application id (<em>only required for Azure service principal OAuth
+M2M</em>)</p></li>
+<li><p><code>ARM_CLIENT_SECRET</code>: Azure AD service principal client
+secret (<em>only required for Azure service principal OAuth
+M2M</em>)</p></li>
+<li><p><code>ARM_TENANT_ID</code>: Azure AD tenant id (<em>only required
+for Azure service principal OAuth M2M</em>)</p></li>
+<li><p><code>DATABRICKS_AUTH_TYPE</code>: Optional auth mode override
+(<code>oauth-m2m</code>, <code>azure-client-secret</code>,
+<code>oauth-u2m</code>)</p></li>
 <li><p><code>DATABRICKS_WSID</code>: The workspace ID (<a href="https://docs.databricks.com/workspace/workspace-details.html#workspace-instance-names-urls-and-ids">docs</a>)</p></li>
 </ul>
 <p><code>DATABRICKS_WSID</code> is only required for the RStudio IDE
@@ -392,6 +402,16 @@ DATABRICKS_WSID=123123123123123</code></pre>
 DATABRICKS_CLIENT_ID=11111111-2222-3333-4444-555555555555
 DATABRICKS_CLIENT_SECRET=abcdefg1234567890
 DATABRICKS_WSID=123123123123123</code></pre>
+<p>For Azure service principal OAuth M2M:</p>
+<pre><code>DATABRICKS_HOST=adb-xxxxxx.xx.azuredatabricks.net
+ARM_CLIENT_ID=11111111-2222-3333-4444-555555555555
+ARM_CLIENT_SECRET=abcdefg1234567890
+ARM_TENANT_ID=aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee</code></pre>
+<p>With no explicit auth override, <code>{brickster}</code> attempts
+Databricks OAuth M2M (<code>DATABRICKS_CLIENT_*</code>), then Azure
+service principal OAuth M2M (<code>ARM_*</code>), then OAuth U2M. Set
+<code>DATABRICKS_AUTH_TYPE=azure-client-secret</code> to force Azure
+service principal authentication.</p>
 <p><strong>Note</strong>: Recommend creating an <code>.Renviron</code>
 for each project. You can create <code>.Renviron</code> within your user
 home directory if required.</p>
@@ -405,16 +425,16 @@ credentials in your R code. You can load <code>{brickster}</code> and
 list the clusters within the workspace using
 <code>db_cluster_list()</code>, to access the host/token use
 <code>db_host()</code>/<code>db_token()</code> respectively.</p>
-<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="fu">library</span>(brickster)</span>
-<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a></span>
-<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a><span class="co"># using db_host() and db_token() to get credentials</span></span>
-<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>clusters <span class="ot">&lt;-</span> <span class="fu">db_cluster_list</span>(<span class="at">host =</span> <span class="fu">db_host</span>(), <span class="at">token =</span> <span class="fu">db_token</span>())</span></code></pre></div>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="fu">library</span>(brickster)</span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a></span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a><span class="co"># using db_host() and db_token() to get credentials</span></span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>clusters <span class="ot">&lt;-</span> <span class="fu">db_cluster_list</span>(<span class="at">host =</span> <span class="fu">db_host</span>(), <span class="at">token =</span> <span class="fu">db_token</span>())</span></code></pre></div>
 <p>All <code>{brickster}</code> functions have their host/token
 parameters default to calling
 <code>db_host()</code>/<code>db_token()</code> therefore we can omit
 explicit calls to the functions.</p>
-<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="co"># all host/token parameters default to db_host()/db_token()</span></span>
-<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>clusters <span class="ot">&lt;-</span> <span class="fu">db_cluster_list</span>()</span></code></pre></div>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="co"># all host/token parameters default to db_host()/db_token()</span></span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a>clusters <span class="ot">&lt;-</span> <span class="fu">db_cluster_list</span>()</span></code></pre></div>
 <p>When using OAuth U2M or OAuth M2M authentication you don’t define a
 token in <code>.Renviron</code> and therefore <code>db_token()</code>
 will return <code>NULL</code>.</p>
@@ -433,12 +453,12 @@ CLI</a>)</li>
 <p>To differentiate between (1) and (2) the option
 <code>use_databrickscfg</code> is used, the following example shows how
 to switch the session to use <code>.databrickscfg</code>.</p>
-<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="co"># will use the `DEFAULT` profile in `.databrickscfg`</span></span>
-<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a><span class="fu">options</span>(<span class="at">use_databrickscfg =</span> <span class="cn">TRUE</span>)</span>
-<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a></span>
-<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a><span class="co"># values returned should be those in profile of `.databrickscfg`</span></span>
-<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a><span class="fu">db_host</span>()</span>
-<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a><span class="fu">db_token</span>()</span></code></pre></div>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="co"># will use the `DEFAULT` profile in `.databrickscfg`</span></span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a><span class="fu">options</span>(<span class="at">use_databrickscfg =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a></span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a><span class="co"># values returned should be those in profile of `.databrickscfg`</span></span>
+<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a><span class="fu">db_host</span>()</span>
+<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a><span class="fu">db_token</span>()</span></code></pre></div>
 <p>The default behaviour is to read credentials from
 <code>.Renviron</code>. If you wish to change this it’s recommended to
 set the option within <code>.Rprofile</code> so that it’s set during
@@ -455,21 +475,21 @@ credentials are returned by
 </ul>
 <p>This behaviour works when using credentials specified in either
 <code>.Renviron</code> or <code>.databrickscfg</code>:</p>
-<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="co"># using .Renviron</span></span>
-<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a><span class="fu">db_host</span>() <span class="co"># returns `DB_HOST` (.Renviron)</span></span>
-<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a></span>
-<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a><span class="co"># switch profile to &#39;prod&#39;</span></span>
-<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a><span class="fu">options</span>(<span class="at">db_profile =</span> <span class="st">&quot;prod&quot;</span>)</span>
-<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a><span class="fu">db_host</span>() <span class="co"># returns `DB_HOST_PROD` (.Renviron)</span></span>
-<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a></span>
-<span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a><span class="co"># set back to default (NULL)</span></span>
-<span id="cb6-9"><a href="#cb6-9" tabindex="-1"></a><span class="fu">options</span>(<span class="at">db_profile =</span> <span class="cn">NULL</span>)</span>
-<span id="cb6-10"><a href="#cb6-10" tabindex="-1"></a><span class="co"># use .databrickcfg</span></span>
-<span id="cb6-11"><a href="#cb6-11" tabindex="-1"></a><span class="fu">options</span>(<span class="at">use_databrickscfg =</span> <span class="cn">TRUE</span>)</span>
-<span id="cb6-12"><a href="#cb6-12" tabindex="-1"></a><span class="fu">db_host</span>() <span class="co"># returns host from `DEFAULT` profile (.databrickscfg)</span></span>
-<span id="cb6-13"><a href="#cb6-13" tabindex="-1"></a></span>
-<span id="cb6-14"><a href="#cb6-14" tabindex="-1"></a><span class="fu">options</span>(<span class="at">db_profile =</span> <span class="st">&quot;prod&quot;</span>)</span>
-<span id="cb6-15"><a href="#cb6-15" tabindex="-1"></a><span class="fu">db_host</span>() <span class="co"># returns host from `prod` profile in (.datarickscfg)</span></span></code></pre></div>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a><span class="co"># using .Renviron</span></span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a><span class="fu">db_host</span>() <span class="co"># returns `DB_HOST` (.Renviron)</span></span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a></span>
+<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a><span class="co"># switch profile to &#39;prod&#39;</span></span>
+<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a><span class="fu">options</span>(<span class="at">db_profile =</span> <span class="st">&quot;prod&quot;</span>)</span>
+<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a><span class="fu">db_host</span>() <span class="co"># returns `DB_HOST_PROD` (.Renviron)</span></span>
+<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a></span>
+<span id="cb7-8"><a href="#cb7-8" tabindex="-1"></a><span class="co"># set back to default (NULL)</span></span>
+<span id="cb7-9"><a href="#cb7-9" tabindex="-1"></a><span class="fu">options</span>(<span class="at">db_profile =</span> <span class="cn">NULL</span>)</span>
+<span id="cb7-10"><a href="#cb7-10" tabindex="-1"></a><span class="co"># use .databrickcfg</span></span>
+<span id="cb7-11"><a href="#cb7-11" tabindex="-1"></a><span class="fu">options</span>(<span class="at">use_databrickscfg =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb7-12"><a href="#cb7-12" tabindex="-1"></a><span class="fu">db_host</span>() <span class="co"># returns host from `DEFAULT` profile (.databrickscfg)</span></span>
+<span id="cb7-13"><a href="#cb7-13" tabindex="-1"></a></span>
+<span id="cb7-14"><a href="#cb7-14" tabindex="-1"></a><span class="fu">options</span>(<span class="at">db_profile =</span> <span class="st">&quot;prod&quot;</span>)</span>
+<span id="cb7-15"><a href="#cb7-15" tabindex="-1"></a><span class="fu">db_host</span>() <span class="co"># returns host from `prod` profile in (.datarickscfg)</span></span></code></pre></div>
 <p>It is expected that profiles in <code>.Renviron</code> will adhere to
 the same naming convention as default but add an additional suffix.</p>
 <p>Here is an example of an <code>.Renviron</code> file that has three
@@ -494,6 +514,19 @@ from Databricks CLI</a>.</p>
 <p>There is only one <code>{brickster}</code> specific feature and it is
 the inclusion of <code>wsid</code> alongside
 <code>host</code>/<code>token</code>.</p>
+<p>When using OAuth M2M with a <code>.databrickscfg</code> profile:</p>
+<ul>
+<li>Databricks service principal fields: <code>client_id</code>,
+<code>client_secret</code></li>
+<li>Azure service principal fields: <code>azure_client_id</code>,
+<code>azure_client_secret</code>, <code>azure_tenant_id</code></li>
+<li>Optional auth mode override: <code>auth_type</code>
+(<code>oauth-m2m</code>, <code>azure-client-secret</code>,
+<code>oauth-u2m</code>)</li>
+</ul>
+<p>If both <code>DATABRICKS_AUTH_TYPE</code> (environment variable) and
+<code>auth_type</code> (<code>.databrickscfg</code>) are set,
+<code>DATABRICKS_AUTH_TYPE</code> takes precedence.</p>
 <p><code>wsid</code> is used by the connections pane integration in
 RStudio as the underlying API’s require it.</p>
 </div>
@@ -508,8 +541,8 @@ managed Databricks OAuth credentials selected, <code>{brickster}</code>
 functions using <code>db_host()</code>/<code>db_token()</code>
 respectively should just work without needing to specify any credentials
 in your R code. See the code below as an example.</p>
-<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="fu">library</span>(brickster)</span>
-<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a><span class="fu">db_cluster_list</span>()</span></code></pre></div>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a><span class="fu">library</span>(brickster)</span>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a><span class="fu">db_cluster_list</span>()</span></code></pre></div>
 <p><code>{brickster}</code> will automatically detect when a session has
 Workbench managed OAuth credentials and then use the
 <code>workbench</code> profile defined in a <code>.databrickscfg</code>

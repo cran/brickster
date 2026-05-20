@@ -28,6 +28,7 @@ setClass(
     catalog = "character",
     schema = "character",
     staging_volume = "character",
+    disposition = "character",
     max_active_connections = "numeric",
     fetch_timeout = "numeric"
   )
@@ -51,7 +52,7 @@ setClass(
 
 #' Create Databricks SQL Driver
 #'
-#' @return A DatabricksDriver object
+#' @returns A DatabricksDriver object
 #' @export
 #' @examples
 #' \dontrun{
@@ -83,6 +84,9 @@ setMethod("show", "DatabricksDriver", function(object) {
 #' @param catalog Optional catalog name to use as default
 #' @param schema Optional schema name to use as default
 #' @param staging_volume Optional volume path for large dataset staging
+#' @param disposition Query disposition mode to use by default for DBI query
+#'   results. Use `"EXTERNAL_LINKS"` for large results or `"INLINE"` for
+#'   smaller results that must avoid direct cloud-storage result downloads.
 #' @param max_active_connections Maximum number of concurrent download
 #' connections when fetching query results (default: 30)
 #' @param fetch_timeout Timeout in seconds for downloading each result chunk
@@ -90,7 +94,7 @@ setMethod("show", "DatabricksDriver", function(object) {
 #' @param token Authentication token (defaults to db_token())
 #' @param host Databricks workspace host (defaults to db_host())
 #' @param ... Additional arguments (ignored)
-#' @return A DatabricksConnection object
+#' @returns A DatabricksConnection object
 #' @export
 setMethod(
   "dbConnect",
@@ -102,12 +106,15 @@ setMethod(
     catalog = NULL,
     schema = NULL,
     staging_volume = NULL,
+    disposition = c("EXTERNAL_LINKS", "INLINE"),
     max_active_connections = 30,
     fetch_timeout = 300,
     token = db_token(),
     host = db_host(),
     ...
   ) {
+    disposition <- match.arg(disposition)
+
     # Validate required parameters
     if (
       !is.null(warehouse_id) &&
@@ -115,7 +122,7 @@ setMethod(
         !is.null(http_path) &&
         nzchar(http_path)
     ) {
-      cli::cli_abort("Specify only one of warehouse_id or http_path")
+      cli::cli_abort("Specify only one of {.arg warehouse_id} or {.arg http_path}")
     }
 
     if (is.null(warehouse_id) || !nzchar(warehouse_id)) {
@@ -123,17 +130,17 @@ setMethod(
         warehouse_id <- warehouse_id_from_http_path(http_path)
       } else {
         cli::cli_abort(
-          "warehouse_id or http_path must be provided and non-empty"
+          "{.arg warehouse_id} or {.arg http_path} must be provided and non-empty"
         )
       }
     }
 
     if (!is.numeric(max_active_connections) || max_active_connections <= 0) {
-      cli::cli_abort("max_active_connections must be a positive numeric value")
+      cli::cli_abort("{.arg max_active_connections} must be a positive numeric value")
     }
 
     if (!is.numeric(fetch_timeout) || fetch_timeout <= 0) {
-      cli::cli_abort("fetch_timeout must be a positive numeric value")
+      cli::cli_abort("{.arg fetch_timeout} must be a positive numeric value")
     }
 
     # Validate connection by testing a simple query
@@ -154,7 +161,7 @@ setMethod(
       },
       error = function(e) {
         cli::cli_abort(
-          "Failed to connect to warehouse {warehouse_id}: {e$message}"
+          "Failed to connect to warehouse {.val {warehouse_id}}: {e$message}"
         )
       }
     )
@@ -168,6 +175,7 @@ setMethod(
       catalog = catalog %||% "",
       schema = schema %||% "",
       staging_volume = staging_volume %||% "",
+      disposition = disposition,
       max_active_connections = max_active_connections,
       fetch_timeout = fetch_timeout
     )
@@ -181,7 +189,7 @@ setMethod(
 #' Disconnect from Databricks
 #' @param conn A DatabricksConnection object
 #' @param ... Additional arguments (ignored)
-#' @return `TRUE` (invisibly)
+#' @returns `TRUE` (invisibly)
 #' @export
 setMethod("dbDisconnect", "DatabricksConnection", function(conn, ...) {
   # Databricks connections are stateless, so just return TRUE
@@ -191,7 +199,7 @@ setMethod("dbDisconnect", "DatabricksConnection", function(conn, ...) {
 #' Check if connection is valid
 #' @param dbObj A DatabricksConnection object
 #' @param ... Additional arguments (ignored)
-#' @return `TRUE` if connection is valid, `FALSE` otherwise
+#' @returns `TRUE` if connection is valid, `FALSE` otherwise
 #' @export
 setMethod("dbIsValid", "DatabricksConnection", function(dbObj, ...) {
   # Check if connection has required fields
@@ -218,6 +226,7 @@ setMethod("show", "DatabricksConnection", function(object) {
   if (!is.null(object@staging_volume) && nzchar(object@staging_volume)) {
     cat("  Staging Volume:", object@staging_volume, "\n")
   }
+  cat("  Disposition:", object@disposition, "\n")
   cat("  Max Active Connections:", object@max_active_connections, "\n")
   cat("  Fetch Timeout (s):", object@fetch_timeout, "\n")
 })
@@ -227,14 +236,17 @@ setMethod("show", "DatabricksConnection", function(object) {
 #' Send query to Databricks (asynchronous)
 #' @param conn A DatabricksConnection object
 #' @param statement SQL statement to execute
+#' @param disposition Query disposition mode. Defaults to the connection's
+#'   `disposition` setting.
 #' @param ... Additional arguments (ignored)
-#' @return A DatabricksResult object
+#' @returns A DatabricksResult object
 #' @export
 setMethod(
   "dbSendQuery",
   signature = c(conn = "DatabricksConnection", statement = "character"),
-  function(conn, statement, ...) {
+  function(conn, statement, disposition = conn@disposition, ...) {
     db_assert_statement(statement)
+    disposition <- match.arg(disposition, c("EXTERNAL_LINKS", "INLINE"))
 
     # Execute query asynchronously
     resp <- db_sql_exec_query(
@@ -242,8 +254,8 @@ setMethod(
       statement = statement,
       catalog = if (nzchar(conn@catalog)) conn@catalog else NULL,
       schema = if (nzchar(conn@schema)) conn@schema else NULL,
-      disposition = "EXTERNAL_LINKS",
-      format = "ARROW_STREAM",
+      disposition = disposition,
+      format = if (disposition == "INLINE") "JSON_ARRAY" else "ARROW_STREAM",
       wait_timeout = "0s", # Async execution
       host = conn@host,
       token = conn@token
@@ -265,11 +277,11 @@ setMethod(
 #'
 #' @param conn A DatabricksConnection object
 #' @param statement SQL statement to execute
-#' @param disposition Query disposition mode: "EXTERNAL_LINKS" (default) for large results,
-#'   "INLINE" for small metadata queries (automatically chooses appropriate format)
+#' @param disposition Query disposition mode. Defaults to the connection's
+#'   `disposition` setting.
 #' @param show_progress If `TRUE`, show progress updates during query execution (default: `TRUE`)
 #' @param ... Additional arguments passed to underlying query execution
-#' @return A data.frame with query results
+#' @returns A data.frame with query results
 #' @export
 setMethod(
   "dbGetQuery",
@@ -277,10 +289,12 @@ setMethod(
   function(
     conn,
     statement,
-    disposition = "EXTERNAL_LINKS",
+    disposition = conn@disposition,
     show_progress = TRUE,
     ...
   ) {
+    disposition <- match.arg(disposition, c("EXTERNAL_LINKS", "INLINE"))
+
     # Detect schema discovery queries (LIMIT 0) and optimize them
     if (endsWith(trimws(statement), "LIMIT 0")) {
       # Force INLINE disposition and disable progress for schema queries
@@ -311,7 +325,7 @@ setMethod(
 #' @param conn A DatabricksConnection object
 #' @param statement SQL statement
 #' @param ... Additional arguments (ignored)
-#' @return A DatabricksResult object
+#' @returns A DatabricksResult object
 #' @export
 setMethod(
   "dbSendStatement",
@@ -348,7 +362,7 @@ setMethod(
 #' @param conn A DatabricksConnection object
 #' @param statement SQL statement
 #' @param ... Additional arguments (ignored)
-#' @return Number of rows in result set (from metadata, without loading data)
+#' @returns Number of rows in result set (from metadata, without loading data)
 #' @export
 setMethod(
   "dbExecute",
@@ -388,7 +402,7 @@ setMethod(
 #' @param res A DatabricksResult object
 #' @param n Maximum number of rows to fetch (-1 for all rows)
 #' @param ... Additional arguments (ignored)
-#' @return A data.frame with query results
+#' @returns A data.frame with query results
 #' @export
 setMethod("dbFetch", "DatabricksResult", function(res, n = -1, ...) {
   if (res@completed) {
@@ -397,7 +411,11 @@ setMethod("dbFetch", "DatabricksResult", function(res, n = -1, ...) {
   }
 
   # Check if we need to poll for completion and start executing step
-  initial_status <- db_sql_exec_status(statement_id = res@statement_id)
+  initial_status <- db_sql_exec_status(
+    statement_id = res@statement_id,
+    host = res@connection@host,
+    token = res@connection@token
+  )
   if (initial_status$status$state %in% c("RUNNING", "PENDING")) {
     cli::cli_progress_step("Executing query")
     status <- db_sql_exec_poll_for_success(
@@ -415,6 +433,15 @@ setMethod("dbFetch", "DatabricksResult", function(res, n = -1, ...) {
   # Use total_row_count to detect empty result sets
   if (status$manifest$total_row_count == 0) {
     results <- db_sql_create_empty_result(status$manifest)
+  } else if (
+    identical(status$manifest$format, "JSON_ARRAY") ||
+      !is.null(status$result$data_array)
+  ) {
+    results <- db_sql_process_inline(
+      result_data = status$result,
+      manifest = status$manifest,
+      row_limit = if (n > 0) n else NULL
+    )
   } else {
     # Use helper function to fetch results with progress
     results <- db_sql_fetch_results(
@@ -439,7 +466,7 @@ setMethod("dbFetch", "DatabricksResult", function(res, n = -1, ...) {
 #' Check if query has completed
 #' @param res A DatabricksResult object
 #' @param ... Additional arguments (ignored)
-#' @return `TRUE` if query is complete, `FALSE` otherwise
+#' @returns `TRUE` if query is complete, `FALSE` otherwise
 #' @export
 setMethod("dbHasCompleted", "DatabricksResult", function(res, ...) {
   if (res@completed) {
@@ -459,7 +486,7 @@ setMethod("dbHasCompleted", "DatabricksResult", function(res, ...) {
 #' Clear result set
 #' @param res A DatabricksResult object
 #' @param ... Additional arguments (ignored)
-#' @return `TRUE` (invisibly)
+#' @returns `TRUE` (invisibly)
 #' @export
 setMethod("dbClearResult", "DatabricksResult", function(res, ...) {
   # Databricks automatically cleans up after a period of time
@@ -471,7 +498,7 @@ setMethod("dbClearResult", "DatabricksResult", function(res, ...) {
 #' Get SQL statement from result
 #' @param res A DatabricksResult object
 #' @param ... Additional arguments (ignored)
-#' @return The SQL statement as character
+#' @returns The SQL statement as character
 #' @export
 setMethod("dbGetStatement", "DatabricksResult", function(res, ...) {
   res@statement
@@ -480,7 +507,7 @@ setMethod("dbGetStatement", "DatabricksResult", function(res, ...) {
 #' Get number of rows fetched
 #' @param res A DatabricksResult object
 #' @param ... Additional arguments (ignored)
-#' @return Number of rows fetched so far
+#' @returns Number of rows fetched so far
 #' @export
 setMethod("dbGetRowCount", "DatabricksResult", function(res, ...) {
   res@rows_fetched
@@ -489,7 +516,7 @@ setMethod("dbGetRowCount", "DatabricksResult", function(res, ...) {
 #' Get number of rows affected (not applicable for SELECT)
 #' @param res A DatabricksResult object
 #' @param ... Additional arguments (ignored)
-#' @return -1 (not applicable for SELECT queries)
+#' @returns -1 (not applicable for SELECT queries)
 #' @export
 setMethod("dbGetRowsAffected", "DatabricksResult", function(res, ...) {
   # For SELECT queries, return -1 (no rows affected)
@@ -499,7 +526,7 @@ setMethod("dbGetRowsAffected", "DatabricksResult", function(res, ...) {
 #' Get column information from result
 #' @param res A DatabricksResult object
 #' @param ... Additional arguments (ignored)
-#' @return A data.frame with column names and types
+#' @returns A data.frame with column names and types
 #' @export
 setMethod("dbColumnInfo", "DatabricksResult", function(res, ...) {
   # Get column info from the result metadata
@@ -541,7 +568,7 @@ setMethod("show", "DatabricksResult", function(object) {
 #' List tables in Databricks catalog/schema
 #' @param conn A DatabricksConnection object
 #' @param ... Additional arguments (ignored)
-#' @return Character vector of table names
+#' @returns Character vector of table names
 #' @export
 setMethod("dbListTables", "DatabricksConnection", function(conn, ...) {
   db_assert_valid_conn(conn)
@@ -572,7 +599,7 @@ setMethod("dbListTables", "DatabricksConnection", function(conn, ...) {
 #' @param conn A DatabricksConnection object
 #' @param name Table name to check
 #' @param ... Additional arguments (ignored)
-#' @return `TRUE` if table exists, `FALSE` otherwise
+#' @returns `TRUE` if table exists, `FALSE` otherwise
 #' @export
 setMethod(
   "dbExistsTable",
@@ -601,7 +628,7 @@ setMethod(
 #' @param conn A DatabricksConnection object
 #' @param name Table name as Id object
 #' @param ... Additional arguments (ignored)
-#' @return `TRUE` if table exists, `FALSE` otherwise
+#' @returns `TRUE` if table exists, `FALSE` otherwise
 #' @export
 setMethod(
   "dbExistsTable",
@@ -630,7 +657,7 @@ setMethod(
 #' @param conn A DatabricksConnection object
 #' @param name Table name as AsIs object (from I())
 #' @param ... Additional arguments (ignored)
-#' @return `TRUE` if table exists, `FALSE` otherwise
+#' @returns `TRUE` if table exists, `FALSE` otherwise
 #' @export
 setMethod(
   "dbExistsTable",
@@ -648,7 +675,7 @@ setMethod(
 #' @param conn A DatabricksConnection object
 #' @param name Table name to remove
 #' @param ... Additional arguments (ignored)
-#' @return `TRUE` invisibly on success
+#' @returns `TRUE` invisibly on success
 #' @export
 setMethod(
   "dbRemoveTable",
@@ -669,7 +696,7 @@ setMethod(
 #' @param conn A DatabricksConnection object
 #' @param name Table name as Id object
 #' @param ... Additional arguments (ignored)
-#' @return `TRUE` invisibly on success
+#' @returns `TRUE` invisibly on success
 #' @export
 setMethod(
   "dbRemoveTable",
@@ -690,7 +717,7 @@ setMethod(
 #' @param conn A DatabricksConnection object
 #' @param name Table name as AsIs object (from I())
 #' @param ... Additional arguments (ignored)
-#' @return `TRUE` invisibly on success
+#' @returns `TRUE` invisibly on success
 #' @export
 setMethod(
   "dbRemoveTable",
@@ -708,7 +735,7 @@ setMethod(
 #' @param conn A DatabricksConnection object
 #' @param name Table name to read
 #' @param ... Additional arguments passed to dbGetQuery
-#' @return A data.frame with table contents
+#' @returns A data.frame with table contents
 #' @export
 setMethod(
   "dbReadTable",
@@ -728,7 +755,7 @@ setMethod(
 #' @param conn A DatabricksConnection object
 #' @param name Table name as Id object
 #' @param ... Additional arguments passed to dbGetQuery
-#' @return A data.frame with table contents
+#' @returns A data.frame with table contents
 #' @export
 setMethod(
   "dbReadTable",
@@ -748,7 +775,7 @@ setMethod(
 #' @param conn A DatabricksConnection object
 #' @param name Table name as AsIs object (from I())
 #' @param ... Additional arguments passed to dbGetQuery
-#' @return A data.frame with table contents
+#' @returns A data.frame with table contents
 #' @export
 setMethod(
   "dbReadTable",
@@ -769,7 +796,7 @@ setMethod(
 #' @param row.names Ignored (included for DBI compatibility)
 #' @param temporary If `TRUE`, create temporary table (NOT SUPPORTED - will error)
 #' @param ... Additional arguments (ignored)
-#' @return `TRUE` invisibly on success
+#' @returns `TRUE` invisibly on success
 #' @export
 setMethod(
   "dbCreateTable",
@@ -805,7 +832,7 @@ setMethod(
 #' @param row.names Ignored (included for DBI compatibility)
 #' @param temporary If `TRUE`, create temporary table (NOT SUPPORTED - will error)
 #' @param ... Additional arguments (ignored)
-#' @return `TRUE` invisibly on success
+#' @returns `TRUE` invisibly on success
 #' @export
 setMethod(
   "dbCreateTable",
@@ -841,7 +868,7 @@ setMethod(
 #' @param row.names Ignored (included for DBI compatibility)
 #' @param temporary If `TRUE`, create temporary table (NOT SUPPORTED - will error)
 #' @param ... Additional arguments (ignored)
-#' @return `TRUE` invisibly on success
+#' @returns `TRUE` invisibly on success
 #' @export
 setMethod(
   "dbCreateTable",
@@ -858,7 +885,7 @@ setMethod(
 #' Get connection information
 #' @param dbObj A DatabricksConnection object
 #' @param ... Additional arguments (ignored)
-#' @return A list with connection details
+#' @returns A list with connection details
 #' @export
 setMethod("dbGetInfo", "DatabricksConnection", function(dbObj, ...) {
   list(
@@ -871,7 +898,8 @@ setMethod("dbGetInfo", "DatabricksConnection", function(dbObj, ...) {
     username = NA_character_,
     host = dbObj@host,
     port = NA_integer_,
-    warehouse_id = dbObj@warehouse_id
+    warehouse_id = dbObj@warehouse_id,
+    disposition = dbObj@disposition
   )
 })
 
@@ -879,7 +907,7 @@ setMethod("dbGetInfo", "DatabricksConnection", function(dbObj, ...) {
 #' @param conn A DatabricksConnection object
 #' @param name Table name to describe
 #' @param ... Additional arguments (ignored)
-#' @return Character vector of column names
+#' @returns Character vector of column names
 #' @export
 setMethod(
   "dbListFields",
@@ -922,7 +950,7 @@ setMethod(
 #' @param conn A DatabricksConnection object
 #' @param name Table name as AsIs object (from I())
 #' @param ... Additional arguments (ignored)
-#' @return Character vector of column names
+#' @returns Character vector of column names
 #' @export
 setMethod(
   "dbListFields",
@@ -940,7 +968,7 @@ setMethod(
 #' Begin transaction (not supported)
 #' @param conn A DatabricksConnection object
 #' @param ... Additional arguments (ignored)
-#' @return Always throws an error (transactions not supported)
+#' @returns Always throws an error (transactions not supported)
 #' @export
 setMethod("dbBegin", "DatabricksConnection", function(conn, ...) {
   cli::cli_abort("Transactions are not supported")
@@ -949,7 +977,7 @@ setMethod("dbBegin", "DatabricksConnection", function(conn, ...) {
 #' Commit transaction (not supported)
 #' @param conn A DatabricksConnection object
 #' @param ... Additional arguments (ignored)
-#' @return Always throws an error (transactions not supported)
+#' @returns Always throws an error (transactions not supported)
 #' @export
 setMethod("dbCommit", "DatabricksConnection", function(conn, ...) {
   cli::cli_abort("Transactions are not supported")
@@ -958,7 +986,7 @@ setMethod("dbCommit", "DatabricksConnection", function(conn, ...) {
 #' Rollback transaction (not supported)
 #' @param conn A DatabricksConnection object
 #' @param ... Additional arguments (ignored)
-#' @return Always throws an error (transactions not supported)
+#' @returns Always throws an error (transactions not supported)
 #' @export
 setMethod("dbRollback", "DatabricksConnection", function(conn, ...) {
   cli::cli_abort("Transactions are not supported")
@@ -978,7 +1006,7 @@ db_assert_valid_conn <- function(conn) {
 #' @keywords internal
 db_assert_statement <- function(statement) {
   if (missing(statement) || is.null(statement) || !nzchar(trimws(statement))) {
-    cli::cli_abort("statement must be provided and non-empty")
+    cli::cli_abort("{.arg statement} must be provided and non-empty")
   }
 }
 
@@ -986,7 +1014,7 @@ db_assert_statement <- function(statement) {
 #' @keywords internal
 warehouse_id_from_http_path <- function(http_path) {
   if (is.null(http_path) || !nzchar(http_path)) {
-    cli::cli_abort("http_path must be provided and non-empty")
+    cli::cli_abort("{.arg http_path} must be provided and non-empty")
   }
 
   sub("^/sql/1\\.0/warehouses/", "", http_path)
@@ -1002,7 +1030,7 @@ db_clean_table_name <- function(name) {
 #' @param dbObj A DatabricksConnection object
 #' @param obj R object(s) to get SQL types for
 #' @param ... Additional arguments (ignored)
-#' @return Character vector of SQL type names
+#' @returns Character vector of SQL type names
 #' @export
 setMethod("dbDataType", "DatabricksConnection", function(dbObj, obj, ...) {
   # Map R types to Databricks SQL types
@@ -1027,17 +1055,17 @@ setMethod("dbDataType", "DatabricksConnection", function(dbObj, obj, ...) {
 #' @keywords internal
 db_prepare_create_table_fields <- function(fields) {
   if (missing(fields) || is.null(fields)) {
-    cli::cli_abort("fields must be provided")
+    cli::cli_abort("{.arg fields} must be provided")
   }
 
   if (is.data.frame(fields)) {
     if (ncol(fields) == 0) {
-      cli::cli_abort("fields must contain at least one column")
+      cli::cli_abort("{.arg fields} must contain at least one column")
     }
     list(value = fields, field_types = NULL)
   } else if (is.character(fields)) {
     if (length(fields) == 0) {
-      cli::cli_abort("fields must contain at least one column")
+      cli::cli_abort("{.arg fields} must contain at least one column")
     }
     field_names <- names(fields)
     if (
@@ -1045,7 +1073,7 @@ db_prepare_create_table_fields <- function(fields) {
         any(is.na(field_names) | !nzchar(field_names))
     ) {
       cli::cli_abort(
-        "fields must be a named character vector when provided as character"
+        "{.arg fields} must be a named character vector when provided as character"
       )
     }
     empty_cols <- setNames(
@@ -1055,7 +1083,7 @@ db_prepare_create_table_fields <- function(fields) {
     value <- as.data.frame(empty_cols, stringsAsFactors = FALSE)
     list(value = value, field_types = fields)
   } else {
-    cli::cli_abort("fields must be a data frame or named character vector")
+    cli::cli_abort("{.arg fields} must be a data frame or named character vector")
   }
 }
 
@@ -1065,7 +1093,7 @@ db_prepare_create_table_fields <- function(fields) {
 #' @param conn A DatabricksConnection object
 #' @param x Character vector of identifiers to quote
 #' @param ... Additional arguments (ignored)
-#' @return SQL object with quoted identifiers
+#' @returns SQL object with quoted identifiers
 #' @export
 setMethod(
   "dbQuoteIdentifier",
@@ -1097,7 +1125,7 @@ setMethod(
 #' @param conn A DatabricksConnection object
 #' @param x SQL object (already quoted)
 #' @param ... Additional arguments (ignored)
-#' @return The SQL object unchanged
+#' @returns The SQL object unchanged
 #' @export
 setMethod(
   "dbQuoteIdentifier",
@@ -1112,14 +1140,14 @@ setMethod(
 #' @param conn A DatabricksConnection object
 #' @param x Id object with catalog/schema/table components
 #' @param ... Additional arguments (ignored)
-#' @return SQL object with quoted identifier components
+#' @returns SQL object with quoted identifier components
 #' @export
 setMethod(
   "dbQuoteIdentifier",
   signature("DatabricksConnection", "Id"),
   function(conn, x, ...) {
     # Handle schema.table identifiers
-    names <- purrr::map_chr(x@name, ~ paste0("`", .x, "`"))
+    names <- purrr::map_chr(x@name, \(x) paste0("`", x, "`"))
     DBI::SQL(paste(names, collapse = "."))
   }
 )
@@ -1136,9 +1164,9 @@ setMethod(
 #' @param temporary If `TRUE`, create temporary table (NOT SUPPORTED - will error)
 #' @param field.types Named character vector of SQL types for columns
 #' @param staging_volume Optional volume path for large dataset staging
-#' @param progress If `TRUE`, show progress bar for file uploads (default: `TRUE`)
-#' @param ... Additional arguments
-#' @return `TRUE` invisibly on success
+#' @param show_progress If `TRUE`, show progress bar for file uploads (default: `TRUE`)
+#' @param ... Additional arguments.
+#' @returns `TRUE` invisibly on success
 #' @export
 setMethod(
   "dbWriteTable",
@@ -1153,12 +1181,20 @@ setMethod(
     temporary = FALSE,
     field.types = NULL,
     staging_volume = NULL,
-    progress = TRUE,
+    show_progress = TRUE,
     ...
   ) {
+    dots <- list(...)
+    if ("progress" %in% names(dots)) {
+      cli::cli_abort("Argument {.arg progress} is not supported; use {.arg show_progress}.")
+    }
+    if (!is.logical(show_progress) || length(show_progress) != 1L || is.na(show_progress)) {
+      cli::cli_abort("{.arg show_progress} must be `TRUE` or `FALSE`.")
+    }
+
     # Validate inputs
     if (overwrite && append) {
-      cli::cli_abort("Cannot specify both overwrite = TRUE and append = TRUE")
+      cli::cli_abort("Cannot specify both {.code overwrite = TRUE} and {.code append = TRUE}")
     }
 
     if (temporary) {
@@ -1175,7 +1211,7 @@ setMethod(
     if (row.names) {
       if (".row_names" %in% names(value)) {
         cli::cli_abort(
-          "Cannot preserve row names: column '.row_names' already exists"
+          "Cannot preserve row names: column {.val .row_names} already exists"
         )
       }
       value <- tibble::add_column(
@@ -1208,7 +1244,7 @@ setMethod(
 
     if (append && !table_exists) {
       cli::cli_abort(
-        "Table {quoted_name} does not exist. Cannot append to non-existing table."
+        "Table {.val {quoted_name}} does not exist. Cannot append to non-existing table."
       )
     }
 
@@ -1217,12 +1253,12 @@ setMethod(
       db_should_use_volume_method(value, effective_staging_volume, temporary)
     ) {
       db_write_table_volume(
-        conn,
-        quoted_name,
-        value,
-        effective_staging_volume,
-        append,
-        progress
+        conn = conn,
+        quoted_name = quoted_name,
+        value = value,
+        staging_volume = effective_staging_volume,
+        append = append,
+        show_progress = show_progress
       )
     } else {
       db_write_table_standard(
@@ -1250,9 +1286,9 @@ setMethod(
 #' @param temporary If `TRUE`, create temporary table (NOT SUPPORTED - will error)
 #' @param field.types Named character vector of SQL types for columns
 #' @param staging_volume Optional volume path for large dataset staging
-#' @param progress If `TRUE`, show progress bar for file uploads (default: `TRUE`)
-#' @param ... Additional arguments
-#' @return `TRUE` invisibly on success
+#' @param show_progress If `TRUE`, show progress bar for file uploads (default: `TRUE`)
+#' @param ... Additional arguments.
+#' @returns `TRUE` invisibly on success
 #' @export
 setMethod(
   "dbWriteTable",
@@ -1267,15 +1303,23 @@ setMethod(
     temporary = FALSE,
     field.types = NULL,
     staging_volume = NULL,
-    progress = TRUE,
+    show_progress = TRUE,
     ...
   ) {
+    dots <- list(...)
+    if ("progress" %in% names(dots)) {
+      cli::cli_abort("Argument {.arg progress} is not supported; use {.arg show_progress}.")
+    }
+    if (!is.logical(show_progress) || length(show_progress) != 1L || is.na(show_progress)) {
+      cli::cli_abort("{.arg show_progress} must be `TRUE` or `FALSE`.")
+    }
+
     # Handle Id object by implementing the logic directly instead of delegating
     # This avoids double-quoting issues
 
     # Validate inputs
     if (overwrite && append) {
-      cli::cli_abort("Cannot specify both overwrite = TRUE and append = TRUE")
+      cli::cli_abort("Cannot specify both {.code overwrite = TRUE} and {.code append = TRUE}")
     }
 
     if (temporary) {
@@ -1316,7 +1360,7 @@ setMethod(
 
     if (append && !table_exists) {
       cli::cli_abort(
-        "Table {quoted_name} does not exist. Cannot append to non-existing table."
+        "Table {.val {quoted_name}} does not exist. Cannot append to non-existing table."
       )
     }
 
@@ -1336,12 +1380,12 @@ setMethod(
       }
 
       db_write_table_volume(
-        conn,
-        quoted_name,
-        value,
-        effective_staging_volume,
-        append,
-        progress
+        conn = conn,
+        quoted_name = quoted_name,
+        value = value,
+        staging_volume = effective_staging_volume,
+        append = append,
+        show_progress = show_progress
       )
     } else {
       db_write_table_standard(
@@ -1369,9 +1413,9 @@ setMethod(
 #' @param temporary If `TRUE`, create temporary table (NOT SUPPORTED - will error)
 #' @param field.types Named character vector of SQL types for columns
 #' @param staging_volume Optional volume path for large dataset staging
-#' @param progress If `TRUE`, show progress bar for file uploads (default: `TRUE`)
-#' @param ... Additional arguments
-#' @return `TRUE` invisibly on success
+#' @param show_progress If `TRUE`, show progress bar for file uploads (default: `TRUE`)
+#' @param ... Additional arguments.
+#' @returns `TRUE` invisibly on success
 #' @export
 setMethod(
   "dbWriteTable",
@@ -1386,7 +1430,7 @@ setMethod(
     temporary = FALSE,
     field.types = NULL,
     staging_volume = NULL,
-    progress = TRUE,
+    show_progress = TRUE,
     ...
   ) {
     # Convert AsIs to character and delegate to character method
@@ -1401,7 +1445,7 @@ setMethod(
       temporary = temporary,
       field.types = field.types,
       staging_volume = staging_volume,
-      progress = progress,
+      show_progress = show_progress,
       ...
     )
   }
@@ -1479,7 +1523,7 @@ db_create_table_from_data <- function(
   }
 
   # Build column definitions
-  col_names <- purrr::map_chr(names(value), ~ dbQuoteIdentifier(conn, .x))
+  col_names <- purrr::map_chr(names(value), \(x) dbQuoteIdentifier(conn, x))
   col_defs <- paste(col_names, col_types, collapse = ", ")
 
   # Create table
@@ -1494,28 +1538,6 @@ db_create_table_from_data <- function(
   dbExecute(conn, create_sql)
 }
 
-
-#' Generate VALUES SQL from data frame
-#' @keywords internal
-db_generate_values_sql <- function(conn, data) {
-  # Convert each row to SQL values
-  row_values <- apply(data, 1, function(row) {
-    values <- purrr::map_chr(row, function(val) {
-      if (is.na(val)) {
-        "NULL"
-      } else if (is.character(val)) {
-        db_escape_string_literal(conn, val)
-      } else if (is.logical(val)) {
-        if (val) "TRUE" else "FALSE"
-      } else {
-        as.character(val)
-      }
-    })
-    paste0("(", paste(values, collapse = ", "), ")")
-  })
-
-  paste(row_values, collapse = ", ")
-}
 
 #' Generate type-aware VALUES SQL from data frame
 #' @keywords internal
@@ -1554,8 +1576,8 @@ db_escape_string_literal <- function(conn, val) {
   }
 
   # Spark SQL accepts backslash-escaped quotes; escape backslashes first
-  escaped <- gsub("\\\\", "\\\\\\\\", val)
-  escaped <- gsub("'", "\\\\'", escaped)
+  escaped <- gsub("\\", "\\\\", val, fixed = TRUE)
+  escaped <- gsub("'", "\\'", escaped, fixed = TRUE)
   paste0("'", escaped, "'")
 }
 
@@ -1600,7 +1622,7 @@ db_create_table_as_select_values <- function(
 #' @keywords internal
 db_append_with_select_values <- function(conn, quoted_name, value) {
   # Get column names with proper quoting
-  col_names <- purrr::map_chr(names(value), ~ dbQuoteIdentifier(conn, .x))
+  col_names <- purrr::map_chr(names(value), \(x) dbQuoteIdentifier(conn, x))
   col_list <- paste(col_names, collapse = ", ")
 
   # Generate VALUES clause with type-aware formatting
@@ -1610,11 +1632,10 @@ db_append_with_select_values <- function(conn, quoted_name, value) {
   insert_sql <- paste0(
     "INSERT INTO ",
     quoted_name,
-    " SELECT * FROM VALUES ",
-    values_sql,
-    " AS t(",
+    " (",
     col_list,
-    ")"
+    ") VALUES ",
+    values_sql
   )
 
   # Execute using helper function
@@ -1683,15 +1704,19 @@ db_write_table_volume <- function(
   value,
   staging_volume,
   append = FALSE,
-  progress = TRUE
+  show_progress = TRUE
 ) {
+  if (!is.logical(show_progress) || length(show_progress) != 1L || is.na(show_progress)) {
+    cli::cli_abort("{.arg show_progress} must be `TRUE` or `FALSE`.")
+  }
+
   # Validate volume path
   staging_volume <- is_valid_volume_path(staging_volume)
 
   if (
     !db_volume_dir_exists(staging_volume, host = conn@host, token = conn@token)
   ) {
-    cli::cli_abort("Staging volume directory does not exist: {staging_volume}")
+    cli::cli_abort("Staging volume directory does not exist: {.path {staging_volume}}")
   }
 
   # Generate unique directory name for dataset
@@ -1715,7 +1740,7 @@ db_write_table_volume <- function(
 
       # Clean up volume directory (recursive since it contains files)
       # Use tryCatch to avoid errors during cleanup from stopping the exit handler
-      if (progress) {
+      if (show_progress) {
         cli::cli_progress_step("Clearing staged files")
       }
 
@@ -1728,12 +1753,12 @@ db_write_table_volume <- function(
             token = conn@token
           )
 
-          if (progress) {
+          if (show_progress) {
             cli::cli_progress_done()
           }
         },
         error = function(e) {
-          if (progress) {
+          if (show_progress) {
             cli::cli_progress_done(result = "failed")
           }
 
@@ -1748,7 +1773,7 @@ db_write_table_volume <- function(
   )
 
   # Convert to Parquet
-  if (progress) {
+  if (show_progress) {
     cli::cli_progress_step("Writing files")
   }
 
@@ -1760,7 +1785,7 @@ db_write_table_volume <- function(
     max_rows_per_file = 5000000L
   )
 
-  if (progress) {
+  if (show_progress) {
     cli::cli_progress_done()
   }
 
@@ -1776,13 +1801,13 @@ db_write_table_volume <- function(
     local_dir = local_temp_dir,
     volume_dir = volume_dataset_path,
     overwrite = TRUE,
-    preserve_structure = TRUE,
+    recursive = TRUE,
     host = conn@host,
     token = conn@token
   )
 
   # Execute SQL to create/populate table
-  if (progress) {
+  if (show_progress) {
     cli::cli_progress_step(
       if (append) {
         "Appending data to table"
@@ -1830,7 +1855,7 @@ db_write_table_volume <- function(
     show_progress = FALSE
   )
 
-  if (progress) cli::cli_progress_done()
+  if (show_progress) cli::cli_progress_done()
 }
 
 #' Append rows to an existing Databricks table
@@ -1839,7 +1864,7 @@ db_write_table_volume <- function(
 #' @param value Data frame to append
 #' @param ... Additional arguments
 #' @param row.names If `TRUE`, preserve row names as a column
-#' @return `TRUE` invisibly on success
+#' @returns `TRUE` invisibly on success
 #' @export
 setMethod(
   "dbAppendTable",
@@ -1853,7 +1878,10 @@ setMethod(
     # Check table exists
     if (!dbExistsTable(conn, name)) {
       cli::cli_abort(
-        "Table {name} does not exist. Use dbWriteTable() to create it first."
+        c(
+          "Table {.val {name}} does not exist.",
+          "i" = "Use {.fn dbWriteTable} to create it first."
+        )
       )
     }
 
@@ -1868,7 +1896,7 @@ setMethod(
 #' @param value Data frame to append
 #' @param ... Additional arguments
 #' @param row.names If `TRUE`, preserve row names as a column
-#' @return `TRUE` invisibly on success
+#' @returns `TRUE` invisibly on success
 #' @export
 setMethod(
   "dbAppendTable",
@@ -1883,7 +1911,10 @@ setMethod(
     if (!dbExistsTable(conn, name)) {
       table_name <- as.character(dbQuoteIdentifier(conn, name))
       cli::cli_abort(
-        "Table {table_name} does not exist. Use dbWriteTable() to create it first."
+        c(
+          "Table {.val {table_name}} does not exist.",
+          "i" = "Use {.fn dbWriteTable} to create it first."
+        )
       )
     }
 
