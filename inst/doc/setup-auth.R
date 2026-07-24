@@ -16,29 +16,38 @@ knitr::opts_chunk$set(
 # clusters <- db_cluster_list()
 
 ## -----------------------------------------------------------------------------
-# # will use the `DEFAULT` profile in `.databrickscfg`
+# # uses the CLI-selected default profile, or `DEFAULT` when none is selected
 # options(use_databrickscfg = TRUE)
 # 
-# # values returned should be those in profile of `.databrickscfg`
+# # values are read from `.databrickscfg`
 # db_host()
 # db_token()
 
 ## -----------------------------------------------------------------------------
 # # using .Renviron
-# db_host() # returns `DB_HOST` (.Renviron)
+# db_host() # returns `DATABRICKS_HOST` (.Renviron)
 # 
 # # switch profile to 'prod'
 # options(db_profile = "prod")
-# db_host() # returns `DB_HOST_PROD` (.Renviron)
+# db_host() # returns `DATABRICKS_HOST_PROD` (.Renviron)
 # 
-# # set back to default (NULL)
+# # clear the session-specific profile selection
 # options(db_profile = NULL)
-# # use .databrickcfg
+# # use .databrickscfg
 # options(use_databrickscfg = TRUE)
-# db_host() # returns host from `DEFAULT` profile (.databrickscfg)
+# db_host() # returns the CLI-selected default, otherwise `DEFAULT` (.databrickscfg)
 # 
 # options(db_profile = "prod")
-# db_host() # returns host from `prod` profile in (.datarickscfg)
+# db_host() # returns host from `prod` profile (.databrickscfg)
+
+## -----------------------------------------------------------------------------
+# options(
+#   use_databrickscfg = TRUE,
+#   db_profile = "e2-demo"
+# )
+# 
+# # The host and CLI token are resolved from the same profile.
+# db_sql_warehouse_list()
 
 ## -----------------------------------------------------------------------------
 # library(brickster)

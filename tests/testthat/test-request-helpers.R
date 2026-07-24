@@ -1,17 +1,30 @@
 local_clear_auth_env <- function() {
-  withr::local_envvar(c(
-    DATABRICKS_AUTH_TYPE = NA_character_,
-    DATABRICKS_CONFIG_FILE = NA_character_,
-    DATABRICKS_CONFIG_PROFILE = NA_character_,
-    ARM_CLIENT_ID = NA_character_,
-    ARM_CLIENT_SECRET = NA_character_,
-    ARM_TENANT_ID = NA_character_
-  ), .local_envir = parent.frame())
+  withr::local_envvar(
+    c(
+      DATABRICKS_CONFIG_FILE = NA_character_,
+      DATABRICKS_CONFIG_PROFILE = NA_character_,
+      ARM_CLIENT_ID = NA_character_,
+      ARM_CLIENT_SECRET = NA_character_,
+      ARM_TENANT_ID = NA_character_
+    ),
+    .local_envir = parent.frame()
+  )
   withr::local_options(
     use_databrickscfg = FALSE,
     db_profile = NULL,
-    brickster_oauth_client = NULL,
     .local_envir = parent.frame()
+  )
+}
+
+local_error_response <- function(
+  body,
+  content_type = "application/json",
+  status = 400
+) {
+  httr2::response(
+    status_code = status,
+    headers = list("content-type" = content_type),
+    body = charToRaw(body)
   )
 }
 
@@ -52,6 +65,44 @@ test_that("request helpers - building requests", {
   expect_null(db_request_json(NULL))
 })
 
+test_that("request error body handles standard Databricks JSON errors", {
+  resp <- local_error_response(
+    paste0(
+      '{"error_code":"PERMISSION_DENIED",',
+      '"message":"You do not have permission to use the SQL Warehouse."}'
+    ),
+    status = 403
+  )
+
+  expect_identical(
+    db_req_error_body(resp),
+    "PERMISSION_DENIED: You do not have permission to use the SQL Warehouse."
+  )
+})
+
+test_that("request error body handles non-JSON Databricks errors", {
+  text_html_resp <- local_error_response(
+    "Invalid Token",
+    content_type = "text/html; charset=utf-8"
+  )
+  string_resp <- local_error_response(
+    "DEADLINE_EXCEEDED: Deadline exceeded when awaiting statement ID",
+    content_type = "text/plain"
+  )
+  empty_resp <- local_error_response(
+    "",
+    content_type = "text/html; charset=utf-8",
+    status = 504
+  )
+
+  expect_identical(db_req_error_body(text_html_resp), "Invalid Token")
+  expect_identical(
+    db_req_error_body(string_resp),
+    "DEADLINE_EXCEEDED: Deadline exceeded when awaiting statement ID"
+  )
+  expect_identical(db_req_error_body(empty_resp), "Gateway Timeout")
+})
+
 test_that("request helpers - m2m auth flow", {
   local_clear_auth_env()
 
@@ -65,8 +116,6 @@ test_that("request helpers - m2m auth flow", {
     DATABRICKS_CLIENT_ID = "client-id",
     DATABRICKS_CLIENT_SECRET = "client-secret"
   )
-  withr::local_options(brickster_oauth_client = NULL)
-
   req <- db_request(
     endpoint = endpoint,
     method = method,
@@ -88,6 +137,57 @@ test_that("request helpers - m2m auth flow", {
     req$policies$auth_sign$params$flow_params$client$id,
     "client-id"
   )
+  expect_identical(req$policies$auth_sign$params$expiry_margin, 40)
+})
+
+test_that("request helpers isolate OAuth clients and tokens by workspace", {
+  local_clear_auth_env()
+
+  withr::local_envvar(
+    DATABRICKS_CLIENT_ID = "client-id",
+    DATABRICKS_CLIENT_SECRET = "client-secret"
+  )
+
+  req_a <- db_request(
+    endpoint = "clusters/list",
+    method = "GET",
+    version = "2.0",
+    host = "workspace-a.cloud.databricks.com",
+    token = NULL
+  )
+  req_b <- db_request(
+    endpoint = "clusters/list",
+    method = "GET",
+    version = "2.0",
+    host = "workspace-b.cloud.databricks.com",
+    token = NULL
+  )
+
+  client_a <- req_a$policies$auth_sign$params$flow_params$client
+  client_b <- req_b$policies$auth_sign$params$flow_params$client
+  expect_identical(
+    client_a$token_url,
+    "https://workspace-a.cloud.databricks.com/oidc/v1/token"
+  )
+  expect_identical(
+    client_b$token_url,
+    "https://workspace-b.cloud.databricks.com/oidc/v1/token"
+  )
+  expect_false(identical(client_a$name, client_b$name))
+
+  cache_a <- req_a$policies$auth_sign$cache
+  cache_b <- req_b$policies$auth_sign$cache
+  cache_a$clear()
+  cache_b$clear()
+  withr::defer(cache_a$clear())
+  withr::defer(cache_b$clear())
+
+  cache_a$set(httr2::oauth_token(
+    access_token = "workspace-a-token",
+    expires_in = 3600
+  ))
+
+  expect_null(cache_b$get())
 })
 
 test_that("request helpers - azure m2m auth flow", {
@@ -104,8 +204,6 @@ test_that("request helpers - azure m2m auth flow", {
     ARM_CLIENT_SECRET = "azure-client-secret",
     ARM_TENANT_ID = "azure-tenant-id"
   )
-  withr::local_options(brickster_oauth_client = NULL)
-
   req <- db_request(
     endpoint = endpoint,
     method = method,

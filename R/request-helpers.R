@@ -43,34 +43,41 @@ db_request <- function(
     httr2::req_retry(max_tries = 3, backoff = ~2, retry_on_failure = TRUE)
 
   # if token is present use directly
-  # otherwise initiate OAuth 2.0 U2M or M2M Workspace flow
+  # otherwise resolve the configured credential provider
   if (!is.null(token)) {
     req <- httr2::req_auth_bearer_token(req = req, token = token)
   } else {
-    # fetch client
-    oauth_client <- getOption(
-      x = "brickster_oauth_client",
-      db_oauth_client(host = host)
-    )
+    auth_type <- db_auth_type()
 
-    if (oauth_client$is_m2m) {
-      req <- httr2::req_oauth_client_credentials(
-        req,
-        client = oauth_client$client,
-        scope = oauth_client$scope,
-        token_params = oauth_client$token_params
-      )
-    } else if (!is_hosted_session() && rlang::is_interactive()) {
-      # use client to auth
-      req <- httr2::req_oauth_auth_code(
-        req,
-        client = oauth_client$client,
-        scope = oauth_client$scope,
-        auth_url = oauth_client$auth_url,
-        redirect_uri = "http://localhost:8020"
-      )
+    if (identical(auth_type, "databricks-cli")) {
+      req <- db_req_auth_databricks_cli(req = req, host = host)
     } else {
-      cli::cli_abort("cannot find token or initiate OAuth flow")
+      oauth_client <- db_oauth_client(
+        host = host,
+        auth_type = auth_type
+      )
+
+      if (oauth_client$is_m2m) {
+        req <- httr2::req_oauth_client_credentials(
+          req,
+          client = oauth_client$client,
+          scope = oauth_client$scope,
+          token_params = oauth_client$token_params,
+          expiry_margin = 40
+        )
+      } else if (!is_hosted_session() && rlang::is_interactive()) {
+        # use client to auth
+        req <- httr2::req_oauth_auth_code(
+          req,
+          client = oauth_client$client,
+          scope = oauth_client$scope,
+          auth_url = oauth_client$auth_url,
+          redirect_uri = "http://localhost:8020",
+          expiry_margin = 40
+        )
+      } else {
+        cli::cli_abort("cannot find token or initiate OAuth flow")
+      }
     }
   }
 
@@ -90,15 +97,29 @@ db_request <- function(
 #'
 #' @family Request Helpers
 db_req_error_body <- function(resp) {
-  json <- resp |> httr2::resp_body_json()
-  # if there is "message":
-  if ("message" %in% names(json)) {
-    paste(json$error_code, json$message, sep = ": ")
-  } else if (length(json) == 1) {
-    json[[1]]
-  } else {
-    paste(json, collapse = " ")
+  content_type <- httr2::resp_content_type(resp)
+
+  if (identical(content_type, "application/json")) {
+    json <- httr2::resp_body_json(resp)
+
+    # if there is "message":
+    if ("message" %in% names(json)) {
+      return(paste(json$error_code, json$message, sep = ": "))
+    } else {
+      return(paste(json, collapse = " "))
+    }
   }
+
+  body <- tryCatch(
+    httr2::resp_body_string(resp),
+    error = function(cnd) NULL
+  )
+
+  if (is.null(body) || !nzchar(trimws(body))) {
+    return(httr2::resp_status_desc(resp))
+  }
+
+  trimws(body)
 }
 
 #' Perform Databricks API Request

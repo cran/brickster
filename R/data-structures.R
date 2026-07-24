@@ -539,7 +539,7 @@ new_cluster <- function(
     ssh_public_keys = ssh_public_keys,
     custom_tags = custom_tags,
     cluster_log_conf = log_conf,
-    init_script_info = init_scripts,
+    init_scripts = init_scripts,
     spark_env_vars = spark_env_vars,
     enable_elastic_disk = enable_elastic_disk,
     driver_instance_pool_id = driver_instance_pool_id,
@@ -1045,8 +1045,8 @@ git_source <- function(
     "awscodecommit"
   )
 
-  match.arg(type)
-  match.arg(git_provider, providers)
+  type <- match.arg(type)
+  git_provider <- match.arg(git_provider, providers)
 
   obj <- list(
     git_url = git_url,

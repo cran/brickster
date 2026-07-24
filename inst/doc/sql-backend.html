@@ -48,8 +48,9 @@ overflow: visible;
 }
 </style>
 <style type="text/css" data-origin="pandoc">
+html { -webkit-text-size-adjust: 100%; }
 pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
 pre > code.sourceCode > span:empty { height: 1.2em; }
 .sourceCode { overflow: visible; }
 code.sourceCode > span { color: inherit; text-decoration: inherit; }
@@ -60,7 +61,7 @@ div.sourceCode { overflow: auto; }
 }
 @media print {
 pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
 }
 pre.numberSource code
 { counter-reset: source-line 0; }
@@ -415,8 +416,9 @@ Execution API</a> in combination with the <a href="https://docs.databricks.com/a
 <span id="cb1-7"><a href="#cb1-7" tabindex="-1"></a>con <span class="ot">&lt;-</span> <span class="fu">dbConnect</span>(</span>
 <span id="cb1-8"><a href="#cb1-8" tabindex="-1"></a>  <span class="at">drv =</span> <span class="fu">DatabricksSQL</span>(),</span>
 <span id="cb1-9"><a href="#cb1-9" tabindex="-1"></a>  <span class="at">warehouse_id =</span> <span class="st">&quot;&lt;your_warehouse_id&gt;&quot;</span>,</span>
-<span id="cb1-10"><a href="#cb1-10" tabindex="-1"></a>  <span class="at">catalog =</span> <span class="st">&quot;samples&quot;</span></span>
-<span id="cb1-11"><a href="#cb1-11" tabindex="-1"></a>)</span></code></pre></div>
+<span id="cb1-10"><a href="#cb1-10" tabindex="-1"></a>  <span class="at">catalog =</span> <span class="st">&quot;samples&quot;</span>,</span>
+<span id="cb1-11"><a href="#cb1-11" tabindex="-1"></a>  <span class="at">show_progress =</span> <span class="cn">FALSE</span></span>
+<span id="cb1-12"><a href="#cb1-12" tabindex="-1"></a>)</span></code></pre></div>
 </div>
 <div id="dbi-backend" class="section level2">
 <h2><code>{DBI}</code> Backend</h2>
@@ -473,7 +475,7 @@ you have permission to write files.</p>
 <span id="cb4-17"><a href="#cb4-17" tabindex="-1"></a>  <span class="at">value =</span> iris_big,</span>
 <span id="cb4-18"><a href="#cb4-18" tabindex="-1"></a>  <span class="at">overwrite =</span> <span class="cn">TRUE</span>,</span>
 <span id="cb4-19"><a href="#cb4-19" tabindex="-1"></a>  <span class="at">staging_volume =</span> <span class="st">&quot;/Volumes/&lt;catalog&gt;/&lt;schema&gt;/&lt;volume&gt;/...&quot;</span>, <span class="co"># or inherited from connection</span></span>
-<span id="cb4-20"><a href="#cb4-20" tabindex="-1"></a>  <span class="at">progress =</span> <span class="cn">TRUE</span></span>
+<span id="cb4-20"><a href="#cb4-20" tabindex="-1"></a>  <span class="at">show_progress =</span> <span class="cn">TRUE</span></span>
 <span id="cb4-21"><a href="#cb4-21" tabindex="-1"></a>)</span></code></pre></div>
 </div>
 </div>

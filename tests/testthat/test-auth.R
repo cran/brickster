@@ -1,19 +1,50 @@
 local_clear_auth_env <- function() {
-  withr::local_envvar(c(
-    DATABRICKS_AUTH_TYPE = NA_character_,
-    DATABRICKS_CONFIG_FILE = NA_character_,
-    DATABRICKS_CONFIG_PROFILE = NA_character_,
-    ARM_CLIENT_ID = NA_character_,
-    ARM_CLIENT_SECRET = NA_character_,
-    ARM_TENANT_ID = NA_character_
-  ), .local_envir = parent.frame())
+  withr::local_envvar(
+    c(
+      DATABRICKS_CONFIG_FILE = NA_character_,
+      DATABRICKS_CONFIG_PROFILE = NA_character_,
+      ARM_CLIENT_ID = NA_character_,
+      ARM_CLIENT_SECRET = NA_character_,
+      ARM_TENANT_ID = NA_character_
+    ),
+    .local_envir = parent.frame()
+  )
   withr::local_options(
     use_databrickscfg = FALSE,
     db_profile = NULL,
-    brickster_oauth_client = NULL,
     .local_envir = parent.frame()
   )
 }
+
+test_that("OAuth client cache identities are stable and workspace-specific", {
+  local_clear_auth_env()
+
+  u2m_a <- db_oauth_client(
+    host = "workspace-a.cloud.databricks.com",
+    client_id = NULL,
+    client_secret = NULL,
+    auth_type = "oauth-u2m"
+  )
+  u2m_a_again <- db_oauth_client(
+    host = "workspace-a.cloud.databricks.com",
+    client_id = NULL,
+    client_secret = NULL,
+    auth_type = "oauth-u2m"
+  )
+  u2m_b <- db_oauth_client(
+    host = "workspace-b.cloud.databricks.com",
+    client_id = NULL,
+    client_secret = NULL,
+    auth_type = "oauth-u2m"
+  )
+
+  expect_identical(u2m_a$client$name, u2m_a_again$client$name)
+  expect_false(identical(u2m_a$client$name, u2m_b$client$name))
+  expect_identical(
+    u2m_b$auth_url,
+    "https://workspace-b.cloud.databricks.com/oidc/v1/authorize"
+  )
+})
 
 test_that("auth functions - baseline behaviour", {
   local_clear_auth_env()
@@ -243,8 +274,7 @@ test_that("auth functions - azure m2m credentials from env", {
   withr::local_envvar(
     ARM_CLIENT_ID = "azure-client-id",
     ARM_CLIENT_SECRET = "azure-client-secret",
-    ARM_TENANT_ID = "azure-tenant-id",
-    DATABRICKS_AUTH_TYPE = "azure-client-secret"
+    ARM_TENANT_ID = "azure-tenant-id"
   )
 
   client <- db_oauth_client(
@@ -323,7 +353,7 @@ test_that("auth functions - default fallback selects azure m2m before u2m", {
   expect_identical(client$auth_mode, "azure-client-secret")
 })
 
-test_that("auth functions - auth type ordering and override", {
+test_that("auth functions - auth type ordering and explicit override", {
   local_clear_auth_env()
 
   withr::local_envvar(
@@ -338,8 +368,10 @@ test_that("auth functions - auth type ordering and override", {
   expect_identical(default_client$auth_mode, "oauth-m2m")
   expect_identical(default_client$client$id, "dbx-client-id")
 
-  withr::local_envvar(DATABRICKS_AUTH_TYPE = "azure-client-secret")
-  azure_client <- db_oauth_client(host = "some-host")
+  azure_client <- db_oauth_client(
+    host = "some-host",
+    auth_type = "azure-client-secret"
+  )
   expect_identical(azure_client$auth_mode, "azure-client-secret")
   expect_identical(azure_client$client$id, "azure-client-id")
 })
@@ -350,12 +382,11 @@ test_that("auth functions - auth type override requires matching credentials", {
   withr::local_envvar(
     ARM_CLIENT_ID = "azure-client-id",
     ARM_CLIENT_SECRET = "azure-client-secret",
-    ARM_TENANT_ID = "azure-tenant-id",
-    DATABRICKS_AUTH_TYPE = "oauth-m2m"
+    ARM_TENANT_ID = "azure-tenant-id"
   )
 
   expect_error(
-    db_oauth_client(host = "some-host"),
+    db_oauth_client(host = "some-host", auth_type = "oauth-m2m"),
     "DATABRICKS_CLIENT_ID"
   )
 })
@@ -363,39 +394,15 @@ test_that("auth functions - auth type override requires matching credentials", {
 test_that("auth functions - invalid auth type errors", {
   local_clear_auth_env()
 
-  withr::local_envvar(DATABRICKS_AUTH_TYPE = "not-real")
   expect_error(
-    db_oauth_client(host = "some-host", client_id = NULL, client_secret = NULL),
+    db_oauth_client(
+      host = "some-host",
+      client_id = NULL,
+      client_secret = NULL,
+      auth_type = "not-real"
+    ),
     "Supported values"
   )
-})
-
-test_that("auth functions - env auth type overrides .databrickscfg auth type", {
-  local_clear_auth_env()
-
-  withr::local_options(use_databrickscfg = TRUE)
-  withr::local_envvar(
-    DATABRICKS_CONFIG_FILE = "databricks.cfg",
-    DATABRICKS_AUTH_TYPE = "oauth-u2m",
-    DATABRICKS_CLIENT_ID = "dbx-client-id",
-    DATABRICKS_CLIENT_SECRET = "dbx-client-secret",
-    ARM_CLIENT_ID = "azure-client-id",
-    ARM_CLIENT_SECRET = "azure-client-secret",
-    ARM_TENANT_ID = "azure-tenant-id"
-  )
-  withr::local_file("databricks.cfg", {
-    writeLines(
-      c(
-        '[DEFAULT]',
-        'host = http://some-host',
-        'auth_type = azure-client-secret'
-      ),
-      "databricks.cfg"
-    )
-  })
-
-  client <- db_oauth_client(host = "some-host")
-  expect_identical(client$auth_mode, "oauth-u2m")
 })
 
 test_that("auth functions - host handling", {

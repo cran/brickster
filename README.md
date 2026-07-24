@@ -2,7 +2,7 @@
 
 <!-- badges: start -->
 
-[![CRAN status](https://www.r-pkg.org/badges/version/brickster)](https://CRAN.R-project.org/package=brickster) [![Codecov test coverage](https://codecov.io/gh/databrickslabs/brickster/graph/badge.svg)](https://app.codecov.io/gh/databrickslabs/brickster)
+[![CRAN status](https://www.r-pkg.org/badges/version/brickster)](https://CRAN.R-project.org/package=brickster) [![R-CMD-check](https://github.com/databrickslabs/brickster/workflows/R-CMD-check/badge.svg)](https://github.com/databrickslabs/brickster/actions) [![Codecov test coverage](https://codecov.io/gh/databrickslabs/brickster/graph/badge.svg)](https://app.codecov.io/gh/databrickslabs/brickster)
 
 <!-- badges: end -->
 
@@ -34,6 +34,16 @@ warehouses <- db_sql_warehouse_list()
 ```
 
 Refer to the ["Connect to a Databricks Workspace"](https://databrickslabs.github.io/brickster/articles/setup-auth.html) article for more details on getting authentication configured.
+
+If you already authenticated with a profile created by `databricks auth login`,
+`{brickster}` can reuse its short-lived OAuth credentials:
+
+``` r
+options(
+  use_databrickscfg = TRUE,
+  db_profile = "<profile-name>"
+)
+```
 
 ## Usage
 

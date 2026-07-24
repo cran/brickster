@@ -48,8 +48,9 @@ overflow: visible;
 }
 </style>
 <style type="text/css" data-origin="pandoc">
+html { -webkit-text-size-adjust: 100%; }
 pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
 pre > code.sourceCode > span:empty { height: 1.2em; }
 .sourceCode { overflow: visible; }
 code.sourceCode > span { color: inherit; text-decoration: inherit; }
@@ -60,7 +61,7 @@ div.sourceCode { overflow: auto; }
 }
 @media print {
 pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
 }
 pre.numberSource code
 { counter-reset: source-line 0; }
@@ -346,7 +347,8 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 workspace in three ways:</p>
 <ol style="list-style-type: decimal">
 <li><a href="https://docs.databricks.com/en/dev-tools/auth/oauth-u2m.html#oauth-user-to-machine-u2m-authentication">OAuth
-user-to-machine (U2M) authentication</a></li>
+user-to-machine (U2M) authentication</a>, either directly or through
+credentials managed by the Databricks CLI</li>
 <li><a href="https://docs.databricks.com/en/dev-tools/auth/oauth-m2m.html">OAuth
 machine-to-machine (M2M) authentication</a></li>
 <li><a href="https://docs.databricks.com/en/dev-tools/auth/pat.html">Personal
@@ -386,9 +388,6 @@ secret (<em>only required for Azure service principal OAuth
 M2M</em>)</p></li>
 <li><p><code>ARM_TENANT_ID</code>: Azure AD tenant id (<em>only required
 for Azure service principal OAuth M2M</em>)</p></li>
-<li><p><code>DATABRICKS_AUTH_TYPE</code>: Optional auth mode override
-(<code>oauth-m2m</code>, <code>azure-client-secret</code>,
-<code>oauth-u2m</code>)</p></li>
 <li><p><code>DATABRICKS_WSID</code>: The workspace ID (<a href="https://docs.databricks.com/workspace/workspace-details.html#workspace-instance-names-urls-and-ids">docs</a>)</p></li>
 </ul>
 <p><code>DATABRICKS_WSID</code> is only required for the RStudio IDE
@@ -407,11 +406,13 @@ DATABRICKS_WSID=123123123123123</code></pre>
 ARM_CLIENT_ID=11111111-2222-3333-4444-555555555555
 ARM_CLIENT_SECRET=abcdefg1234567890
 ARM_TENANT_ID=aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee</code></pre>
-<p>With no explicit auth override, <code>{brickster}</code> attempts
+<p>With no <code>auth_type</code> in a selected
+<code>.databrickscfg</code> profile, <code>{brickster}</code> attempts
 Databricks OAuth M2M (<code>DATABRICKS_CLIENT_*</code>), then Azure
-service principal OAuth M2M (<code>ARM_*</code>), then OAuth U2M. Set
-<code>DATABRICKS_AUTH_TYPE=azure-client-secret</code> to force Azure
-service principal authentication.</p>
+service principal OAuth M2M (<code>ARM_*</code>), then OAuth U2M. When
+using <code>.databrickscfg</code>, set
+<code>auth_type = azure-client-secret</code> in the profile to force
+Azure service principal authentication.</p>
 <p><strong>Note</strong>: Recommend creating an <code>.Renviron</code>
 for each project. You can create <code>.Renviron</code> within your user
 home directory if required.</p>
@@ -450,24 +451,39 @@ additional set of credentials is differentiated via a suffix
 <li>Using a <code>.databrickscfg</code> file (primary method in <a href="https://docs.databricks.com/dev-tools/cli/index.html#set-up-authentication">Databricks
 CLI</a>)</li>
 </ol>
-<p>To differentiate between (1) and (2) the option
-<code>use_databrickscfg</code> is used, the following example shows how
-to switch the session to use <code>.databrickscfg</code>.</p>
-<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="co"># will use the `DEFAULT` profile in `.databrickscfg`</span></span>
+<p>The <code>use_databrickscfg</code> option selects which configuration
+source <code>{brickster}</code> reads. It does not sign in to the
+Databricks CLI or select a named profile. The following example switches
+the session from <code>.Renviron</code> to
+<code>.databrickscfg</code>:</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="co"># uses the CLI-selected default profile, or `DEFAULT` when none is selected</span></span>
 <span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a><span class="fu">options</span>(<span class="at">use_databrickscfg =</span> <span class="cn">TRUE</span>)</span>
 <span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a></span>
-<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a><span class="co"># values returned should be those in profile of `.databrickscfg`</span></span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a><span class="co"># values are read from `.databrickscfg`</span></span>
 <span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a><span class="fu">db_host</span>()</span>
 <span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a><span class="fu">db_token</span>()</span></code></pre></div>
-<p>The default behaviour is to read credentials from
-<code>.Renviron</code>. If you wish to change this it’s recommended to
-set the option within <code>.Rprofile</code> so that it’s set during
-initialization of the R session.</p>
+<p>With its default value of <code>FALSE</code>,
+<code>{brickster}</code> does not discover profiles created by
+<code>databricks auth login</code> and does not enable the
+<code>databricks-cli</code> authentication provider. Set the option in
+<code>.Rprofile</code> when <code>.databrickscfg</code> should be the
+normal configuration source. Posit Workbench managed OAuth sessions
+enable <code>.databrickscfg</code> automatically.</p>
 <div id="switching-between-credentials" class="section level3">
 <h3>Switching Between Credentials</h3>
-<p>The <code>db_profile</code> option controls which profiles
-credentials are returned by
-<code>db_host()</code>/<code>db_token()</code>/<code>db_wsid()</code>.</p>
+<p>When <code>.databrickscfg</code> is enabled, the selected profile
+controls the host, credentials, authentication type, and the profile
+passed to <code>databricks auth token</code>. <code>{brickster}</code>
+resolves the profile in this order:</p>
+<ol style="list-style-type: decimal">
+<li><code>DATABRICKS_CONFIG_PROFILE</code></li>
+<li>The <code>db_profile</code> option</li>
+<li>The CLI default selected by <code>databricks auth switch</code></li>
+<li>The <code>DEFAULT</code> profile</li>
+</ol>
+<p><code>DATABRICKS_CONFIG_PROFILE</code> is the standard Databricks
+unified authentication setting. <code>db_profile</code> is the
+<code>{brickster}</code> session-level equivalent.</p>
 <p>Profiles enable you to switch contexts between:</p>
 <ul>
 <li><p>Different workspaces (e.g. development or production)</p></li>
@@ -476,20 +492,20 @@ credentials are returned by
 <p>This behaviour works when using credentials specified in either
 <code>.Renviron</code> or <code>.databrickscfg</code>:</p>
 <div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a><span class="co"># using .Renviron</span></span>
-<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a><span class="fu">db_host</span>() <span class="co"># returns `DB_HOST` (.Renviron)</span></span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a><span class="fu">db_host</span>() <span class="co"># returns `DATABRICKS_HOST` (.Renviron)</span></span>
 <span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a></span>
 <span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a><span class="co"># switch profile to &#39;prod&#39;</span></span>
 <span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a><span class="fu">options</span>(<span class="at">db_profile =</span> <span class="st">&quot;prod&quot;</span>)</span>
-<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a><span class="fu">db_host</span>() <span class="co"># returns `DB_HOST_PROD` (.Renviron)</span></span>
+<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a><span class="fu">db_host</span>() <span class="co"># returns `DATABRICKS_HOST_PROD` (.Renviron)</span></span>
 <span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a></span>
-<span id="cb7-8"><a href="#cb7-8" tabindex="-1"></a><span class="co"># set back to default (NULL)</span></span>
+<span id="cb7-8"><a href="#cb7-8" tabindex="-1"></a><span class="co"># clear the session-specific profile selection</span></span>
 <span id="cb7-9"><a href="#cb7-9" tabindex="-1"></a><span class="fu">options</span>(<span class="at">db_profile =</span> <span class="cn">NULL</span>)</span>
-<span id="cb7-10"><a href="#cb7-10" tabindex="-1"></a><span class="co"># use .databrickcfg</span></span>
+<span id="cb7-10"><a href="#cb7-10" tabindex="-1"></a><span class="co"># use .databrickscfg</span></span>
 <span id="cb7-11"><a href="#cb7-11" tabindex="-1"></a><span class="fu">options</span>(<span class="at">use_databrickscfg =</span> <span class="cn">TRUE</span>)</span>
-<span id="cb7-12"><a href="#cb7-12" tabindex="-1"></a><span class="fu">db_host</span>() <span class="co"># returns host from `DEFAULT` profile (.databrickscfg)</span></span>
+<span id="cb7-12"><a href="#cb7-12" tabindex="-1"></a><span class="fu">db_host</span>() <span class="co"># returns the CLI-selected default, otherwise `DEFAULT` (.databrickscfg)</span></span>
 <span id="cb7-13"><a href="#cb7-13" tabindex="-1"></a></span>
 <span id="cb7-14"><a href="#cb7-14" tabindex="-1"></a><span class="fu">options</span>(<span class="at">db_profile =</span> <span class="st">&quot;prod&quot;</span>)</span>
-<span id="cb7-15"><a href="#cb7-15" tabindex="-1"></a><span class="fu">db_host</span>() <span class="co"># returns host from `prod` profile in (.datarickscfg)</span></span></code></pre></div>
+<span id="cb7-15"><a href="#cb7-15" tabindex="-1"></a><span class="fu">db_host</span>() <span class="co"># returns host from `prod` profile (.databrickscfg)</span></span></code></pre></div>
 <p>It is expected that profiles in <code>.Renviron</code> will adhere to
 the same naming convention as default but add an additional suffix.</p>
 <p>Here is an example of an <code>.Renviron</code> file that has three
@@ -514,7 +530,8 @@ from Databricks CLI</a>.</p>
 <p>There is only one <code>{brickster}</code> specific feature and it is
 the inclusion of <code>wsid</code> alongside
 <code>host</code>/<code>token</code>.</p>
-<p>When using OAuth M2M with a <code>.databrickscfg</code> profile:</p>
+<p>Supported OAuth fields in a <code>.databrickscfg</code> profile
+include:</p>
 <ul>
 <li>Databricks service principal fields: <code>client_id</code>,
 <code>client_secret</code></li>
@@ -522,13 +539,54 @@ the inclusion of <code>wsid</code> alongside
 <code>azure_client_secret</code>, <code>azure_tenant_id</code></li>
 <li>Optional auth mode override: <code>auth_type</code>
 (<code>oauth-m2m</code>, <code>azure-client-secret</code>,
-<code>oauth-u2m</code>)</li>
+<code>oauth-u2m</code>, <code>databricks-cli</code>)</li>
 </ul>
-<p>If both <code>DATABRICKS_AUTH_TYPE</code> (environment variable) and
-<code>auth_type</code> (<code>.databrickscfg</code>) are set,
-<code>DATABRICKS_AUTH_TYPE</code> takes precedence.</p>
+<div id="databricks-cli-oauth-profiles" class="section level4">
+<h4>Databricks CLI OAuth profiles</h4>
+<p>Profiles created by <code>databricks auth login</code> use
+<code>auth_type = databricks-cli</code>. The login can be performed from
+any terminal; the credentials are not scoped to that terminal session.
+<code>{brickster}</code> must run as the same operating-system user and
+use the same <code>.databrickscfg</code> and CLI credential storage.</p>
+<p>The <code>databricks-cli</code> provider is intentionally available
+only when the selected <code>.databrickscfg</code> profile contains
+<code>auth_type = databricks-cli</code>. Environment configuration
+cannot activate this provider independently.</p>
+<p>Enable <code>.databrickscfg</code> and select the profile before
+making requests:</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a><span class="fu">options</span>(</span>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a>  <span class="at">use_databrickscfg =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a>  <span class="at">db_profile =</span> <span class="st">&quot;e2-demo&quot;</span></span>
+<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a>)</span>
+<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a></span>
+<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a><span class="co"># The host and CLI token are resolved from the same profile.</span></span>
+<span id="cb9-7"><a href="#cb9-7" tabindex="-1"></a><span class="fu">db_sql_warehouse_list</span>()</span></code></pre></div>
+<p>Instead of <code>db_profile</code>, set
+<code>DATABRICKS_CONFIG_PROFILE</code>, or select the CLI default
+outside R:</p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a><span class="ex">databricks</span> auth switch <span class="at">--profile</span> e2-demo</span></code></pre></div>
+<p>When a profile is selected, <code>{brickster}</code> calls
+<code>databricks auth token --profile &lt;profile&gt;</code>. Without a
+selected profile, <code>{brickster}</code> follows the Databricks SDK
+behavior and asks the CLI for the resolved host. If multiple profiles
+contain the same host, the CLI refuses to guess; select a profile rather
+than signing in again. Avoid supplying a different <code>host</code>
+argument while a profile is selected, because the request host and CLI
+credential would no longer describe the same configuration.</p>
+<p>Token acquisition is deferred until an API request is performed.
+<code>{brickster}</code> keeps only the short-lived access token in
+memory until it expires, then calls the CLI again. The Databricks CLI
+remains responsible for durable credential storage and refresh. The CLI
+must be available on <code>PATH</code>, or its executable can be
+provided with <code>DATABRICKS_CLI_PATH</code>.
+<code>DATABRICKS_CONFIG_FILE</code> is inherited by the CLI when using a
+non-default config location.</p>
+<p>The <code>oauth-u2m</code> mode remains <code>{brickster}</code>’s
+direct browser-based OAuth flow; it does not reuse credentials created
+by <code>databricks auth login</code>.</p>
 <p><code>wsid</code> is used by the connections pane integration in
 RStudio as the underlying API’s require it.</p>
+</div>
 </div>
 <div id="posit-workbench-managed-databricks-oauth-credentials" class="section level3">
 <h3>Posit Workbench Managed Databricks OAuth Credentials</h3>
@@ -541,8 +599,8 @@ managed Databricks OAuth credentials selected, <code>{brickster}</code>
 functions using <code>db_host()</code>/<code>db_token()</code>
 respectively should just work without needing to specify any credentials
 in your R code. See the code below as an example.</p>
-<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a><span class="fu">library</span>(brickster)</span>
-<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a><span class="fu">db_cluster_list</span>()</span></code></pre></div>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a><span class="fu">library</span>(brickster)</span>
+<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a><span class="fu">db_cluster_list</span>()</span></code></pre></div>
 <p><code>{brickster}</code> will automatically detect when a session has
 Workbench managed OAuth credentials and then use the
 <code>workbench</code> profile defined in a <code>.databrickscfg</code>

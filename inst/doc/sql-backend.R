@@ -15,7 +15,8 @@ knitr::opts_chunk$set(
 # con <- dbConnect(
 #   drv = DatabricksSQL(),
 #   warehouse_id = "<your_warehouse_id>",
-#   catalog = "samples"
+#   catalog = "samples",
+#   show_progress = FALSE
 # )
 
 ## -----------------------------------------------------------------------------
@@ -55,7 +56,7 @@ knitr::opts_chunk$set(
 #   value = iris_big,
 #   overwrite = TRUE,
 #   staging_volume = "/Volumes/<catalog>/<schema>/<volume>/...", # or inherited from connection
-#   progress = TRUE
+#   show_progress = TRUE
 # )
 # 
 
