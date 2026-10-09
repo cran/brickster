@@ -48,9 +48,8 @@ overflow: visible;
 }
 </style>
 <style type="text/css" data-origin="pandoc">
-html { -webkit-text-size-adjust: 100%; }
 pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span { line-height: 1.25; }
 pre > code.sourceCode > span:empty { height: 1.2em; }
 .sourceCode { overflow: visible; }
 code.sourceCode > span { color: inherit; text-decoration: inherit; }
@@ -61,7 +60,7 @@ div.sourceCode { overflow: auto; }
 }
 @media print {
 pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
 }
 pre.numberSource code
 { counter-reset: source-line 0; }
@@ -343,6 +342,19 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 
 <p><code>{brickster}</code> has 1:1 mappings with the clusters REST API,
 enabling full control of Databricks clusters from your R session.</p>
+<div id="listing-clusters" class="section level2">
+<h2>Listing Clusters</h2>
+<p><code>db_cluster_list()</code> returns one page from Clusters API
+2.1, with up to 20 clusters by default. Extract <code>$clusters</code>
+for the records and use <code>$next_page_token</code> to retrieve
+another page. Earlier versions returned cluster records directly. To
+collect all clusters, pass the listing function to
+<code>db_list_all_pages()</code>:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a>clusters <span class="ot">&lt;-</span> <span class="fu">db_list_all_pages</span>(db_cluster_list, <span class="at">page_size =</span> <span class="dv">100</span>)</span></code></pre></div>
+<p>The helper returns a list of cluster records with pagination metadata
+removed. The Connections pane uses the same helper to follow all
+pages.</p>
+</div>
 <div id="cluster-creation" class="section level2">
 <h2>Cluster Creation</h2>
 <p>Clusters have a number of parameters and can be configured to match
@@ -354,19 +366,19 @@ cloud platforms (AWS, Azure, GCP).</p>
 <code>azure_attributes()</code>, or <code>gcp_attributes()</code>.</p>
 <p>Below we will create a cluster on AWS and then step through using the
 other supporting functions.</p>
-<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">library</span>(brickster)</span>
-<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a></span>
-<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a><span class="co"># create a small cluster on AWS with DBR 9.1 LTS</span></span>
-<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a>new_cluster <span class="ot">&lt;-</span> <span class="fu">db_cluster_create</span>(</span>
-<span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a>  <span class="at">name =</span> <span class="st">&quot;brickster-cluster&quot;</span>,</span>
-<span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a>  <span class="at">spark_version =</span> <span class="st">&quot;9.1.x-scala2.12&quot;</span>,</span>
-<span id="cb1-7"><a href="#cb1-7" tabindex="-1"></a>  <span class="at">num_workers =</span> <span class="dv">2</span>,</span>
-<span id="cb1-8"><a href="#cb1-8" tabindex="-1"></a>  <span class="at">node_type_id =</span> <span class="st">&quot;m5a.xlarge&quot;</span>,</span>
-<span id="cb1-9"><a href="#cb1-9" tabindex="-1"></a>  <span class="at">cloud_attrs =</span> <span class="fu">aws_attributes</span>(</span>
-<span id="cb1-10"><a href="#cb1-10" tabindex="-1"></a>    <span class="at">ebs_volume_count =</span> <span class="dv">3</span>,</span>
-<span id="cb1-11"><a href="#cb1-11" tabindex="-1"></a>    <span class="at">ebs_volume_size =</span> <span class="dv">100</span></span>
-<span id="cb1-12"><a href="#cb1-12" tabindex="-1"></a>  )</span>
-<span id="cb1-13"><a href="#cb1-13" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="fu">library</span>(brickster)</span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a></span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a><span class="co"># create a small cluster on AWS with DBR 9.1 LTS</span></span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a>new_cluster <span class="ot">&lt;-</span> <span class="fu">db_cluster_create</span>(</span>
+<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a>  <span class="at">name =</span> <span class="st">&quot;brickster-cluster&quot;</span>,</span>
+<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a>  <span class="at">spark_version =</span> <span class="st">&quot;9.1.x-scala2.12&quot;</span>,</span>
+<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a>  <span class="at">num_workers =</span> <span class="dv">2</span>,</span>
+<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a>  <span class="at">node_type_id =</span> <span class="st">&quot;m5a.xlarge&quot;</span>,</span>
+<span id="cb2-9"><a href="#cb2-9" tabindex="-1"></a>  <span class="at">cloud_attrs =</span> <span class="fu">aws_attributes</span>(</span>
+<span id="cb2-10"><a href="#cb2-10" tabindex="-1"></a>    <span class="at">ebs_volume_count =</span> <span class="dv">3</span>,</span>
+<span id="cb2-11"><a href="#cb2-11" tabindex="-1"></a>    <span class="at">ebs_volume_size =</span> <span class="dv">100</span></span>
+<span id="cb2-12"><a href="#cb2-12" tabindex="-1"></a>  )</span>
+<span id="cb2-13"><a href="#cb2-13" tabindex="-1"></a>)</span></code></pre></div>
 <p>Refer to documentation for details on how to use other parameters not
 mentioned here (e.g. <code>spark_conf</code>).</p>
 <p>Before creating a cluster you may want to check the supported values
@@ -407,30 +419,30 @@ just created, including information such as the state.</p>
 <code>RUNNING</code> , which is exactly what
 <code>get_and_start_cluster()</code> uses internally to wait until the
 cluster is running before completing.</p>
-<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a>cluster_info <span class="ot">&lt;-</span> <span class="fu">db_cluster_get</span>(<span class="at">cluster_id =</span> new_cluster<span class="sc">$</span>cluster_id)</span>
-<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a>cluster_info<span class="sc">$</span>state</span></code></pre></div>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>cluster_info <span class="ot">&lt;-</span> <span class="fu">db_cluster_get</span>(<span class="at">cluster_id =</span> new_cluster<span class="sc">$</span>cluster_id)</span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>cluster_info<span class="sc">$</span>state</span></code></pre></div>
 </div>
 <div id="editing-clusters" class="section level2">
 <h2>Editing Clusters</h2>
 <p>You can edit Databricks clusters to change various parameters using
 <code>db_cluster_edit()</code>. For example, we may decide we want our
 cluster to autoscale between 2-8 nodes and add some tags.</p>
-<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a></span>
-<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a><span class="co"># we are required to input all parameters</span></span>
-<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a><span class="fu">db_cluster_edit</span>(</span>
-<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>  <span class="at">cluster_id =</span> new_cluster<span class="sc">$</span>cluster_id,</span>
-<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a>  <span class="at">name =</span> <span class="st">&quot;brickster-cluster&quot;</span>,</span>
-<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a>  <span class="at">spark_version =</span> <span class="st">&quot;9.1.x-scala2.12&quot;</span>,</span>
-<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a>  <span class="at">node_type_id =</span> <span class="st">&quot;m5a.xlarge&quot;</span>,</span>
-<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a>  <span class="at">autoscale =</span> <span class="fu">cluster_autoscale</span>(<span class="at">min_workers =</span> <span class="dv">2</span>, <span class="at">max_workers =</span> <span class="dv">8</span>),</span>
-<span id="cb3-9"><a href="#cb3-9" tabindex="-1"></a>  <span class="at">cloud_attrs =</span> <span class="fu">aws_attributes</span>(</span>
-<span id="cb3-10"><a href="#cb3-10" tabindex="-1"></a>    <span class="at">ebs_volume_count =</span> <span class="dv">3</span>,</span>
-<span id="cb3-11"><a href="#cb3-11" tabindex="-1"></a>    <span class="at">ebs_volume_size =</span> <span class="dv">100</span></span>
-<span id="cb3-12"><a href="#cb3-12" tabindex="-1"></a>  ),</span>
-<span id="cb3-13"><a href="#cb3-13" tabindex="-1"></a>  <span class="at">custom_tags =</span> <span class="fu">list</span>(</span>
-<span id="cb3-14"><a href="#cb3-14" tabindex="-1"></a>    <span class="at">purpose =</span> <span class="st">&quot;brickster_cluster_demo&quot;</span></span>
-<span id="cb3-15"><a href="#cb3-15" tabindex="-1"></a>  )</span>
-<span id="cb3-16"><a href="#cb3-16" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a></span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a><span class="co"># we are required to input all parameters</span></span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a><span class="fu">db_cluster_edit</span>(</span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>  <span class="at">cluster_id =</span> new_cluster<span class="sc">$</span>cluster_id,</span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>  <span class="at">name =</span> <span class="st">&quot;brickster-cluster&quot;</span>,</span>
+<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a>  <span class="at">spark_version =</span> <span class="st">&quot;9.1.x-scala2.12&quot;</span>,</span>
+<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a>  <span class="at">node_type_id =</span> <span class="st">&quot;m5a.xlarge&quot;</span>,</span>
+<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a>  <span class="at">autoscale =</span> <span class="fu">cluster_autoscale</span>(<span class="at">min_workers =</span> <span class="dv">2</span>, <span class="at">max_workers =</span> <span class="dv">8</span>),</span>
+<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a>  <span class="at">cloud_attrs =</span> <span class="fu">aws_attributes</span>(</span>
+<span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a>    <span class="at">ebs_volume_count =</span> <span class="dv">3</span>,</span>
+<span id="cb4-11"><a href="#cb4-11" tabindex="-1"></a>    <span class="at">ebs_volume_size =</span> <span class="dv">100</span></span>
+<span id="cb4-12"><a href="#cb4-12" tabindex="-1"></a>  ),</span>
+<span id="cb4-13"><a href="#cb4-13" tabindex="-1"></a>  <span class="at">custom_tags =</span> <span class="fu">list</span>(</span>
+<span id="cb4-14"><a href="#cb4-14" tabindex="-1"></a>    <span class="at">purpose =</span> <span class="st">&quot;brickster_cluster_demo&quot;</span></span>
+<span id="cb4-15"><a href="#cb4-15" tabindex="-1"></a>  )</span>
+<span id="cb4-16"><a href="#cb4-16" tabindex="-1"></a>)</span></code></pre></div>
 <p>However, if the intention was to only change the size of a given
 cluster the <code>db_cluster_resize()</code> function is a simpler
 alternative.</p>
@@ -438,11 +450,11 @@ alternative.</p>
 range. If the range or workers is adjusted via <code>autoscale</code>
 the number of workers active on the cluster will be increased/decreased
 if they are outside the bounds.</p>
-<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="co"># adjust number autoscale range to be between 4-6 workers</span></span>
-<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a><span class="fu">db_cluster_resize</span>(</span>
-<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a>  <span class="at">cluster_id =</span> new_cluster<span class="sc">$</span>cluster_id,</span>
-<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>  <span class="at">autoscale =</span> <span class="fu">cluster_autoscale</span>(<span class="at">min_workers =</span> <span class="dv">4</span>, <span class="at">max_workers =</span> <span class="dv">6</span>)</span>
-<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="co"># adjust number autoscale range to be between 4-6 workers</span></span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a><span class="fu">db_cluster_resize</span>(</span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a>  <span class="at">cluster_id =</span> new_cluster<span class="sc">$</span>cluster_id,</span>
+<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a>  <span class="at">autoscale =</span> <span class="fu">cluster_autoscale</span>(<span class="at">min_workers =</span> <span class="dv">4</span>, <span class="at">max_workers =</span> <span class="dv">6</span>)</span>
+<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a>)</span></code></pre></div>
 <p>It’s important to note that if specifying <code>num_workers</code>
 instead of <code>autoscale</code> on a cluster than has an existing
 autoscale range it will become a fixed number of workers from that point
@@ -451,11 +463,11 @@ onward.</p>
 removed after 30 days of termination. <code>db_cluster_pin()</code> and
 <code>db_cluster_unpin()</code> are the functions used for changing if a
 cluster is “pinned” or not.</p>
-<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="co"># pin the cluster</span></span>
-<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a><span class="fu">db_cluster_pin</span>(<span class="at">cluster_id =</span> new_cluster<span class="sc">$</span>cluster_id)</span>
-<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a></span>
-<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a><span class="co"># unpin the cluster</span></span>
-<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a><span class="co"># db_cluster_unpin(cluster_id = new_cluster$cluster_id)</span></span></code></pre></div>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="co"># pin the cluster</span></span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a><span class="fu">db_cluster_pin</span>(<span class="at">cluster_id =</span> new_cluster<span class="sc">$</span>cluster_id)</span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a></span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a><span class="co"># unpin the cluster</span></span>
+<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a><span class="co"># db_cluster_unpin(cluster_id = new_cluster$cluster_id)</span></span></code></pre></div>
 </div>
 <div id="cluster-state" class="section level2">
 <h2>Cluster State</h2>
@@ -534,45 +546,70 @@ sources using <code>db_libs_install()</code> and the associated
 </tr>
 </tbody>
 </table>
-<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="co"># installing a package from CRAN on cluster</span></span>
-<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a><span class="fu">db_libs_install</span>(</span>
-<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>  <span class="at">cluster_id =</span> new_cluster<span class="sc">$</span>cluster_id,</span>
-<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>  <span class="at">libraries =</span> <span class="fu">libraries</span>(</span>
-<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>    <span class="fu">lib_cran</span>(<span class="at">package =</span> <span class="st">&quot;palmerpenguins&quot;</span>),</span>
-<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a>    <span class="fu">lib_cran</span>(<span class="at">package =</span> <span class="st">&quot;dplyr&quot;</span>)</span>
-<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a>  )</span>
-<span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a><span class="co"># installing a package from CRAN on cluster</span></span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a><span class="fu">db_libs_install</span>(</span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>  <span class="at">cluster_id =</span> new_cluster<span class="sc">$</span>cluster_id,</span>
+<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a>  <span class="at">libraries =</span> <span class="fu">libraries</span>(</span>
+<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a>    <span class="fu">lib_cran</span>(<span class="at">package =</span> <span class="st">&quot;palmerpenguins&quot;</span>),</span>
+<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a>    <span class="fu">lib_cran</span>(<span class="at">package =</span> <span class="st">&quot;dplyr&quot;</span>)</span>
+<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a>  )</span>
+<span id="cb7-8"><a href="#cb7-8" tabindex="-1"></a>)</span></code></pre></div>
 <p>For convenience the <code>wait_for_lib_installs()</code> function
 will block until all the libraries for the specified cluster have
 finished installing.</p>
-<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a><span class="fu">wait_for_lib_installs</span>(<span class="at">cluster_id =</span> new_cluster<span class="sc">$</span>cluster_id)</span></code></pre></div>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="fu">wait_for_lib_installs</span>(<span class="at">cluster_id =</span> new_cluster<span class="sc">$</span>cluster_id)</span></code></pre></div>
 <p>Installation of libraries is asynchronous and will complete in the
 background. <code>db_libs_cluster_status()</code> is used to check on
 the installation status of libraries for a given cluster,
 <code>db_libs_all_cluster_statuses()</code> is used for getting the
 status of all libraries across all clusters in the workspace.</p>
-<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="fu">db_libs_cluster_status</span>(<span class="at">cluster_id =</span> new_cluster<span class="sc">$</span>cluster_id)</span></code></pre></div>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a><span class="fu">db_libs_cluster_status</span>(<span class="at">cluster_id =</span> new_cluster<span class="sc">$</span>cluster_id)</span></code></pre></div>
 <p>Libraries can be uninstalled using
 <code>db_libs_uninstall()</code>.</p>
-<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a><span class="fu">db_libs_uninstall</span>(</span>
-<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a>  <span class="at">cluster_id =</span> new_cluster<span class="sc">$</span>cluster_id,</span>
-<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a>  <span class="at">libraries =</span> <span class="fu">libraries</span>(</span>
-<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a>    <span class="fu">lib_cran</span>(<span class="at">package =</span> <span class="st">&quot;palmerpenguins&quot;</span>)</span>
-<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a>  )</span>
-<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a><span class="fu">db_libs_uninstall</span>(</span>
+<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a>  <span class="at">cluster_id =</span> new_cluster<span class="sc">$</span>cluster_id,</span>
+<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a>  <span class="at">libraries =</span> <span class="fu">libraries</span>(</span>
+<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a>    <span class="fu">lib_cran</span>(<span class="at">package =</span> <span class="st">&quot;palmerpenguins&quot;</span>)</span>
+<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a>  )</span>
+<span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a>)</span></code></pre></div>
 <p>Using <code>db_libs_cluster_status()</code> shows that the library
 will be uninstalled upon restart
 (e.g. <code>db_cluster_restart()</code>).</p>
-<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a><span class="fu">db_libs_cluster_status</span>(<span class="at">cluster_id =</span> new_cluster<span class="sc">$</span>cluster_id)</span></code></pre></div>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a><span class="fu">db_libs_cluster_status</span>(<span class="at">cluster_id =</span> new_cluster<span class="sc">$</span>cluster_id)</span></code></pre></div>
 </div>
 <div id="events" class="section level2">
 <h2>Events</h2>
-<p>A list of events regarding the clusters activity can be fetched via
+<p>A page of cluster activity events can be fetched via
 <code>db_cluster_events()</code>. There are many <a href="https://docs.databricks.com/api/workspace/clusters/events#events">event
-types</a> that can occur, and by default the 50 most recent events are
-returned.</p>
-<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a>events <span class="ot">&lt;-</span> <span class="fu">db_cluster_events</span>(<span class="at">cluster_id =</span> new_cluster<span class="sc">$</span>cluster_id)</span>
-<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a><span class="fu">head</span>(events, <span class="dv">1</span>)</span></code></pre></div>
+types</a>, and by default up to 50 recent events are returned. Extract
+<code>$events</code> for the records; earlier versions returned these
+records directly. Use the returned pagination tokens to navigate pages,
+retaining the same filters.</p>
+<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a>page <span class="ot">&lt;-</span> <span class="fu">db_cluster_events</span>(<span class="at">cluster_id =</span> new_cluster<span class="sc">$</span>cluster_id, <span class="at">page_size =</span> <span class="dv">50</span>)</span>
+<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a><span class="fu">head</span>(page<span class="sc">$</span>events, <span class="dv">1</span>)</span>
+<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a><span class="cf">if</span> (<span class="sc">!</span><span class="fu">is.null</span>(page<span class="sc">$</span>next_page_token) <span class="sc">&amp;&amp;</span> <span class="fu">nzchar</span>(page<span class="sc">$</span>next_page_token)) {</span>
+<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a>  next_page <span class="ot">&lt;-</span> <span class="fu">db_cluster_events</span>(</span>
+<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a>    <span class="at">cluster_id =</span> new_cluster<span class="sc">$</span>cluster_id,</span>
+<span id="cb12-6"><a href="#cb12-6" tabindex="-1"></a>    <span class="at">page_size =</span> <span class="dv">50</span>,</span>
+<span id="cb12-7"><a href="#cb12-7" tabindex="-1"></a>    <span class="at">page_token =</span> page<span class="sc">$</span>next_page_token</span>
+<span id="cb12-8"><a href="#cb12-8" tabindex="-1"></a>  )</span>
+<span id="cb12-9"><a href="#cb12-9" tabindex="-1"></a>}</span></code></pre></div>
+<p>To collect all matching events, use the same helper. Filters are
+passed to every page request:</p>
+<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a>events <span class="ot">&lt;-</span> <span class="fu">db_list_all_pages</span>(</span>
+<span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a>  db_cluster_events,</span>
+<span id="cb13-3"><a href="#cb13-3" tabindex="-1"></a>  <span class="at">cluster_id =</span> new_cluster<span class="sc">$</span>cluster_id,</span>
+<span id="cb13-4"><a href="#cb13-4" tabindex="-1"></a>  <span class="at">event_types =</span> <span class="fu">list</span>(<span class="st">&quot;RUNNING&quot;</span>, <span class="st">&quot;TERMINATING&quot;</span>),</span>
+<span id="cb13-5"><a href="#cb13-5" tabindex="-1"></a>  <span class="at">page_size =</span> <span class="dv">500</span></span>
+<span id="cb13-6"><a href="#cb13-6" tabindex="-1"></a>)</span></code></pre></div>
+<p><code>offset</code> and <code>limit</code> are deprecated in favor of
+<code>page_token</code> and <code>page_size</code>. Explicit legacy
+arguments still use the old API fields with a warning, but cannot be
+combined with token pagination. Databricks deprecates these fields on
+November 30, 2026. Use tokens from previous responses; numeric offsets
+cannot be converted to tokens. Supply <code>start_time</code> and
+<code>end_time</code> as numeric epoch milliseconds rather than R
+integers.</p>
 </div>
 
 

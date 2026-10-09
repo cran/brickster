@@ -31,12 +31,18 @@ library(brickster)
 # # }
 
 ## -----------------------------------------------------------------------------
-# # list all jobs within Databricks workspace
-# # can control limit, offset, and if cluster/jobs details are returned
-# jobs <- db_jobs_list(limit = 10)
+# # list the first page of jobs in the workspace
+# page <- db_jobs_list(limit = 10)
+# jobs <- page$jobs
 # 
-# # list all runs within a specific job
-# job_runs <- db_jobs_runs_list(job_id = jobs[[1]]$job_id)
+# # retrieve the next page, when available
+# if (!is.null(page$next_page_token)) {
+#   next_page <- db_jobs_list(limit = 10, page_token = page$next_page_token)
+# }
+# 
+# # list the first page of runs for a specific job
+# run_page <- db_jobs_runs_list(job_id = jobs[[1]]$job_id)
+# job_runs <- run_page$runs
 
 ## -----------------------------------------------------------------------------
 # # details of a specific job

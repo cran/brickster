@@ -1,6 +1,6 @@
 Package: brickster
 Title: R Toolkit for 'Databricks'
-Version: 0.2.14
+Version: 0.2.15
 Authors@R: c(
     person("Zac", "Davies", , "zac@databricks.com", role = c("aut", "cre")),
     person("Rafi", "Kurlansik", , "rafi.kurlansik@databricks.com", role = "aut"),
@@ -24,10 +24,10 @@ Config/testthat/edition: 3
 Encoding: UTF-8
 RoxygenNote: 7.3.2
 NeedsCompilation: no
-Packaged: 2026-07-24 01:55:43 UTC; zachary.davies
+Packaged: 2026-10-09 04:43:56 UTC; zachary.davies
 Author: Zac Davies [aut, cre],
   Rafi Kurlansik [aut],
   Databricks [cph, fnd]
 Maintainer: Zac Davies <zac@databricks.com>
 Repository: CRAN
-Date/Publication: 2026-07-24 07:00:02 UTC
+Date/Publication: 2026-10-09 09:50:02 UTC

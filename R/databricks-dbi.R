@@ -412,6 +412,8 @@ setMethod(
 # Result Methods ---------------------------------------------------------------
 
 #' Fetch results from Databricks query
+#' @details INLINE results are fetched across chunks until `n` rows are
+#'   available, or all result chunks have been fetched when `n = -1`.
 #' @param res A DatabricksResult object
 #' @param n Maximum number of rows to fetch (-1 for all rows)
 #' @param show_progress If `TRUE`, show progress updates during result fetching.
@@ -453,32 +455,16 @@ setMethod("dbFetch", "DatabricksResult", function(
     status <- initial_status
   }
 
-  # Check for empty results early and return immediately
-  # Use total_row_count to detect empty result sets
-  if (status$manifest$total_row_count == 0) {
-    results <- db_sql_create_empty_result(status$manifest)
-  } else if (
-    identical(status$manifest$format, "JSON_ARRAY") ||
-      !is.null(status$result$data_array)
-  ) {
-    results <- db_sql_process_inline(
-      result_data = status$result,
-      manifest = status$manifest,
-      row_limit = if (n > 0) n else NULL
-    )
-  } else {
-    # Use helper function to fetch results with progress
-    results <- db_sql_fetch_results(
-      resp = status,
-      return_arrow = FALSE,
-      max_active_connections = res@connection@max_active_connections,
-      fetch_timeout = res@connection@fetch_timeout,
-      row_limit = if (n > 0) n else NULL,
-      host = res@connection@host,
-      token = res@connection@token,
-      show_progress = show_progress
-    )
-  }
+  results <- db_sql_fetch_results(
+    resp = status,
+    return_arrow = FALSE,
+    max_active_connections = res@connection@max_active_connections,
+    fetch_timeout = res@connection@fetch_timeout,
+    row_limit = if (n > 0) n else NULL,
+    host = res@connection@host,
+    token = res@connection@token,
+    show_progress = show_progress
+  )
 
   # Mark as completed and update rows fetched
   res@completed <- TRUE
@@ -943,8 +929,8 @@ setMethod(
     # Clean table name - remove quotes if present
     clean_name <- db_clean_table_name(name)
 
-    # Use DESCRIBE TABLE to get column information with inline disposition
-    sql <- paste0("DESCRIBE TABLE ", clean_name)
+    # DESCRIBE TABLE also returns partition and clustering rows
+    sql <- paste0("SELECT * FROM ", clean_name, " LIMIT 0")
     result <- db_sql_query(
       warehouse_id = conn@warehouse_id,
       statement = sql,
@@ -959,15 +945,7 @@ setMethod(
       show_progress = FALSE
     )
 
-    # Extract column names
-    if ("col_name" %in% names(result)) {
-      result$col_name
-    } else if ("column_name" %in% names(result)) {
-      result$column_name
-    } else {
-      # Fallback to first column
-      result[[1]]
-    }
+    names(result)
   }
 )
 
@@ -1214,7 +1192,7 @@ setMethod(
 #' @param append If `TRUE`, append to existing table
 #' @param row.names If `TRUE`, preserve row names as a column
 #' @param temporary If `TRUE`, create temporary table (NOT SUPPORTED - will error)
-#' @param field.types Named character vector of SQL types for columns
+#' @inheritParams db_write_table_volume
 #' @param staging_volume Optional volume path for large dataset staging
 #' @param show_progress If `TRUE`, show progress updates while writing.
 #'   Defaults to the connection's `show_progress` setting.
@@ -1309,7 +1287,9 @@ setMethod(
         value = value,
         staging_volume = effective_staging_volume,
         append = append,
-        show_progress = show_progress
+        show_progress = show_progress,
+        field.types = field.types,
+        overwrite = overwrite
       )
     } else {
       db_write_table_standard(
@@ -1336,7 +1316,7 @@ setMethod(
 #' @param append If `TRUE`, append to existing table
 #' @param row.names If `TRUE`, preserve row names as a column
 #' @param temporary If `TRUE`, create temporary table (NOT SUPPORTED - will error)
-#' @param field.types Named character vector of SQL types for columns
+#' @inheritParams db_write_table_volume
 #' @param staging_volume Optional volume path for large dataset staging
 #' @param show_progress If `TRUE`, show progress updates while writing.
 #'   Defaults to the connection's `show_progress` setting.
@@ -1436,7 +1416,9 @@ setMethod(
         value = value,
         staging_volume = effective_staging_volume,
         append = append,
-        show_progress = show_progress
+        show_progress = show_progress,
+        field.types = field.types,
+        overwrite = overwrite
       )
     } else {
       db_write_table_standard(
@@ -1463,7 +1445,7 @@ setMethod(
 #' @param append If `TRUE`, append to existing table
 #' @param row.names If `TRUE`, preserve row names as a column
 #' @param temporary If `TRUE`, create temporary table (NOT SUPPORTED - will error)
-#' @param field.types Named character vector of SQL types for columns
+#' @inheritParams db_write_table_volume
 #' @param staging_volume Optional volume path for large dataset staging
 #' @param show_progress If `TRUE`, show progress updates while writing.
 #'   Defaults to the connection's `show_progress` setting.
@@ -1600,11 +1582,13 @@ db_create_table_from_data <- function(
 #' Generate type-aware VALUES SQL from data frame
 #' @keywords internal
 db_generate_typed_values_sql <- function(conn, data) {
+  binary_cols <- purrr::map_lgl(data, db_is_binary_column)
+
   # Convert each row to SQL values with proper typing
   row_values <- purrr::pmap_chr(data, function(...) {
     row <- list(...)
     values <- purrr::imap_chr(row, function(val, col_name) {
-      db_format_typed_value_sql(conn, val, data[[col_name]])
+      db_format_typed_value_sql(conn, val, data[[col_name]], binary_cols[[col_name]])
     })
     paste0("(", paste(values, collapse = ", "), ")")
   })
@@ -1613,11 +1597,18 @@ db_generate_typed_values_sql <- function(conn, data) {
 }
 
 # Format a single R value for inline SQL VALUES.
-db_format_typed_value_sql <- function(conn, val, col_data) {
+db_format_typed_value_sql <- function(
+  conn,
+  val,
+  col_data,
+  is_binary = db_is_binary_column(col_data)
+) {
   if (db_is_missing_sql_value(val)) {
     "NULL"
-  } else if (db_is_binary_column(col_data)) {
+  } else if (is_binary) {
     db_binary_literal(val)
+  } else if (inherits(col_data, "POSIXct")) {
+    db_timestamp_literal(val)
   } else if (is.logical(col_data)) {
     if (as.logical(val)) "TRUE" else "FALSE"
   } else if (is.numeric(col_data)) {
@@ -1644,6 +1635,12 @@ db_binary_literal <- function(val) {
   }
 
   paste0("X'", paste(toupper(as.character(val)), collapse = ""), "'")
+}
+
+db_timestamp_literal <- function(val) {
+  # Match Arrow's POSIXct-to-microsecond conversion used by volume writes.
+  micros <- trunc(as.numeric(val) * 1e6)
+  paste0("TIMESTAMP_MICROS(", sprintf("%.0f", micros), ")")
 }
 
 #' Escape string literals for inline SQL VALUES
@@ -1775,6 +1772,11 @@ db_should_use_volume_method <- function(
 }
 
 #' Write table using volume-based approach
+#' @param field.types Named character vector of SQL types for columns when
+#'   creating or replacing a table. Unspecified columns use [DBI::dbDataType()].
+#'   Volume writes without overrides infer types from Parquet. Databricks
+#'   validates SQL types and enforces the declared schema, including
+#'   `CHAR`/`VARCHAR` length limits. Appends use the existing table schema.
 #' @keywords internal
 db_write_table_volume <- function(
   conn,
@@ -1782,9 +1784,21 @@ db_write_table_volume <- function(
   value,
   staging_volume,
   append = FALSE,
-  show_progress = TRUE
+  show_progress = TRUE,
+  field.types = NULL,
+  overwrite = FALSE
 ) {
   db_assert_show_progress(show_progress)
+  has_field_types <- length(field.types) > 0L
+  if (!append && has_field_types) {
+    if (!is.character(field.types) || !rlang::is_named(field.types) ||
+        anyNA(field.types) || any(!nzchar(trimws(field.types)))) {
+      cli::cli_abort("{.arg field.types} must be a named character vector of non-empty SQL types.")
+    }
+    if (anyDuplicated(names(field.types)) || any(!names(field.types) %in% names(value))) {
+      cli::cli_abort("Each name in {.arg field.types} must match a column in {.arg value} and occur only once.")
+    }
+  }
 
   # Validate volume path
   staging_volume <- is_valid_volume_path(staging_volume)
@@ -1834,6 +1848,14 @@ db_write_table_volume <- function(
           }
         },
         error = function(e) {
+          # Directory was never created (upload failed early), nothing to clean up
+          if (rlang::cnd_inherits(e, "httr2_http_404")) {
+            if (show_progress) {
+              cli::cli_progress_done()
+            }
+            return(invisible(NULL))
+          }
+
           if (show_progress) {
             cli::cli_progress_done(result = "failed")
           }
@@ -1865,14 +1887,7 @@ db_write_table_volume <- function(
     cli::cli_progress_done()
   }
 
-  # Create staging directory
-  db_volume_dir_create(
-    volume_dataset_path,
-    host = conn@host,
-    token = conn@token
-  )
-
-  # Upload files to volume
+  # Upload files to volume (creates the staging directory)
   db_volume_upload_dir(
     local_dir = local_temp_dir,
     volume_dir = volume_dataset_path,
@@ -1894,33 +1909,33 @@ db_write_table_volume <- function(
     )
   }
 
-  # Execute SQL based on operation type
-  if (append) {
-    # Append to existing table
-    copy_sql <- paste0(
-      "COPY INTO ",
-      quoted_name,
-      " ",
-      "FROM '",
-      volume_dataset_path,
-      "' ",
-      "FILEFORMAT = PARQUET"
+  if (!append && has_field_types) {
+    db_create_table_from_data(
+      conn, quoted_name, value, field.types, overwrite = overwrite
+    )
+  }
+
+  read_sql <- paste0(
+    "SELECT * FROM READ_FILES(", db_escape_string_literal(conn, volume_dataset_path),
+    ", format => 'parquet', schemaEvolutionMode => 'none')"
+  )
+  if (append || has_field_types) {
+    # INSERT converts Parquet values to the target types; COPY INTO does not.
+    columns <- paste(dbQuoteIdentifier(conn, names(value)), collapse = ", ")
+    write_sql <- paste0(
+      "INSERT INTO ", quoted_name, " (", columns, ") ", read_sql
     )
   } else {
-    # Create new table from parquet files using READ_FILES
-    copy_sql <- paste0(
-      "CREATE OR REPLACE TABLE ",
-      quoted_name,
-      " AS SELECT * FROM READ_FILES('",
-      volume_dataset_path,
-      "', format => 'parquet', schemaEvolutionMode => 'none')"
+    write_sql <- paste0(
+      if (overwrite) "CREATE OR REPLACE TABLE " else "CREATE TABLE ",
+      quoted_name, " AS ", read_sql
     )
   }
 
   # Execute SQL using helper function (inline since we don't need data back)
   db_sql_exec_and_wait(
     warehouse_id = conn@warehouse_id,
-    statement = copy_sql,
+    statement = write_sql,
     catalog = if (nzchar(conn@catalog)) conn@catalog else NULL,
     schema = if (nzchar(conn@schema)) conn@schema else NULL,
     disposition = "INLINE",

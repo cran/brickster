@@ -293,6 +293,97 @@ test_that("dbWriteTable standard path supports binary columns", {
   )
 })
 
+test_that("binary SQL serialization scans columns once rather than per cell", {
+  con <- make_dbi_test_con()
+  value <- data.frame(id = seq_len(20L))
+  value$payload <- rep(list(as.raw(c(0, 255))), nrow(value))
+  state <- new.env(parent = emptyenv())
+  state$elements_scanned <- 0L
+  original_is_binary <- db_is_binary_column
+
+  local_mocked_bindings(
+    db_is_binary_column = function(x) {
+      state$elements_scanned <- state$elements_scanned + length(x)
+      original_is_binary(x)
+    },
+    .package = "brickster"
+  )
+
+  sql <- db_generate_typed_values_sql(con, value)
+  expected_rows <- purrr::map_chr(value$id, function(id) paste0("(", id, ", X'00FF')"))
+  expect_identical(sql, paste(expected_rows, collapse = ", "))
+  expect_lte(state$elements_scanned, ncol(value) * nrow(value))
+})
+
+test_that("db_format_typed_value_sql writes POSIXct as epoch microseconds", {
+  con <- make_dbi_test_con(show_progress = FALSE)
+  instant <- as.POSIXct("2024-07-01 08:00:00.123456", tz = "UTC")
+  withr::local_envvar(TZ = "America/New_York")
+  withr::local_options(list(digits.secs = 0, scipen = -9))
+
+  purrr::walk(c("UTC", "America/New_York", "Europe/Berlin", ""), function(tz) {
+    x <- instant
+    attr(x, "tzone") <- tz
+    expect_identical(
+      db_format_typed_value_sql(con, x, x),
+      "TIMESTAMP_MICROS(1719820800123456)"
+    )
+  })
+
+  expect_identical(
+    db_timestamp_literal(as.POSIXct("1900-06-15 12:00:00.5", tz = "UTC")),
+    "TIMESTAMP_MICROS(-2194689599500000)"
+  )
+  expect_identical(
+    db_generate_typed_values_sql(con, data.frame(ts = c(instant, NA))),
+    "(TIMESTAMP_MICROS(1719820800123456)), (NULL)"
+  )
+})
+
+test_that("timestamp SQL preserves microseconds and truncates submicroseconds", {
+  values <- .POSIXct(c(
+    1719820800.3, 1719820800.000001, 1719820800.123456,
+    1735689599.9999996, 1104537600.000002,
+    -0.3, -0.000001, -1.0000004, 0
+  ), tz = "UTC")
+  expected <- c(
+    "1719820800300000", "1719820800000001", "1719820800123456",
+    "1735689599999999", "1104537600000001",
+    "-300000", "-1", "-1000000", "0"
+  )
+
+  expect_identical(
+    purrr::map_chr(values, db_timestamp_literal),
+    paste0("TIMESTAMP_MICROS(", expected, ")")
+  )
+})
+
+test_that("inline timestamp SQL agrees with staged Parquet microseconds", {
+  skip_if_not_installed("arrow")
+  skip_if_not(arrow::codec_is_available("zstd"), "Arrow was built without zstd support")
+  value <- data.frame(ts = .POSIXct(c(
+    1719820800.3, 1719820800.000001, 1719820800.123456,
+    1735689599.9999996, 1104537600.000002,
+    -0.3, -0.000001, -1.0000004, 0, NA_real_
+  ), tz = "Europe/Berlin"))
+  path <- fs::file_temp("brickster-timestamps-")
+  withr::defer(fs::dir_delete(path))
+  arrow::write_dataset(value, path, format = "parquet", compression = "zstd")
+  staged <- arrow::read_parquet(
+    fs::dir_ls(path, glob = "*.parquet")[[1]],
+    as_data_frame = FALSE
+  )
+  micros <- as.character(as.vector(staged$GetColumnByName("ts")$cast(arrow::int64())))
+  expected_rows <- ifelse(
+    is.na(micros), "(NULL)", paste0("(TIMESTAMP_MICROS(", micros, "))")
+  )
+
+  expect_identical(
+    db_generate_typed_values_sql(make_dbi_test_con(), value),
+    paste(expected_rows, collapse = ", ")
+  )
+})
+
 test_that("dbAppendTable standard path supports binary columns", {
   con <- make_dbi_test_con(show_progress = FALSE)
   value <- data.frame(id = 4L)
@@ -426,6 +517,18 @@ test_that("dbListTables uses connection context when generating SQL", {
     "SHOW TABLES IN schema_only",
     "SHOW TABLES"
   ))
+})
+
+test_that("dbListFields uses a zero-row query", {
+  local_mocked_bindings(
+    db_sql_query = function(statement, ...) {
+      expect_identical(statement, "SELECT * FROM t LIMIT 0")
+      tibble::tibble(id = integer())
+    },
+    .package = "brickster"
+  )
+
+  expect_identical(dbListFields(make_dbi_test_con(), "t"), "id")
 })
 
 test_that("dbRemoveTable and dbReadTable support character, Id, and AsIs inputs", {
@@ -617,7 +720,7 @@ test_that("dbFetch processes inline results from dbSendQuery", {
         result = list(data_array = list(list(1L), list(2L)))
       )
     },
-    db_sql_fetch_results = function(...) {
+    db_sql_fetch_results_fast = function(...) {
       stop("external result fetcher should not be called")
     },
     .package = "brickster"
@@ -627,6 +730,81 @@ test_that("dbFetch processes inline results from dbSendQuery", {
 
   expect_s3_class(out, "tbl_df")
   expect_identical(out$id, c(1L, 2L))
+})
+
+purrr::walk(c("JSON_ARRAY", "ARROW_STREAM"), function(format) {
+  test_that(paste("dbFetch preserves empty result schema for", format), {
+    fixture <- make_inline_test_result()
+    fixture$response$manifest$format <- format
+    fixture$response$manifest$total_row_count <- 0L
+    fixture$response$manifest$total_chunk_count <- 0L
+    fixture$response$manifest$chunks <- list()
+    fixture$response$result <- list()
+    res <- new(
+      "DatabricksResult",
+      statement_id = "stmt-empty",
+      statement = "SELECT id, label FROM example WHERE FALSE",
+      connection = make_dbi_test_con(show_progress = FALSE),
+      completed = FALSE,
+      rows_fetched = 0
+    )
+
+    local_mocked_bindings(
+      db_sql_exec_status = function(...) fixture$response,
+      db_perform_request = function(...) stop("unexpected result request"),
+      .package = "brickster"
+    )
+
+    expect_identical(dbFetch(res), tibble::tibble(id = integer(), label = character()))
+  })
+})
+
+purrr::walk(c("get", "fetch", "fetch-limited"), function(method) {
+  test_that(paste("DBI INLINE retrieves multiple chunks with", method), {
+    fixture <- make_inline_test_result()
+    con <- make_dbi_test_con(show_progress = FALSE)
+    con@host <- "dbi-inline.test"
+    con@fetch_timeout <- 23
+    state <- new.env(parent = emptyenv())
+    state$chunks <- integer()
+
+    local_mocked_bindings(
+      db_sql_exec_query = function(disposition, format, ...) {
+        expect_identical(disposition, "INLINE")
+        expect_identical(format, "JSON_ARRAY")
+        list(statement_id = "stmt-inline", status = list(state = "RUNNING"))
+      },
+      db_sql_exec_status = function(...) fixture$response,
+      db_perform_request = function(req, ...) {
+        index <- as.integer(sub(".*/chunks/", "", req$url))
+        state$chunks <- c(state$chunks, index)
+        expect_identical(
+          req$url,
+          paste0("https://dbi-inline.test/api/2.0/sql/statements/stmt-inline/result/chunks/", index)
+        )
+        expect_identical(rlang::wref_value(req$headers$Authorization), "Bearer test_token")
+        expect_equal(req$options$timeout_ms, 23000)
+        fixture$chunks[[index + 1L]]
+      },
+      .package = "brickster"
+    )
+
+    if (method == "get") {
+      out <- dbGetQuery(con, "SELECT id, label FROM example", disposition = "INLINE")
+    } else {
+      res <- dbSendQuery(con, "SELECT id, label FROM example", disposition = "INLINE")
+      out <- dbFetch(res, n = if (method == "fetch-limited") 3 else -1)
+    }
+
+    expected_rows <- if (method == "fetch-limited") 3L else 6L
+    expect_s3_class(out, "tbl_df")
+    expect_identical(out$id, as.character(seq_len(expected_rows) - 1L))
+    expect_identical(
+      out$label,
+      list(NULL, NULL, "two", "three", NULL, "five")[seq_len(expected_rows)]
+    )
+    expect_identical(state$chunks, if (method == "fetch-limited") 1L else c(1L, 2L))
+  })
 })
 
 test_that("volume-method selection warns/errors at size thresholds", {
@@ -673,17 +851,12 @@ test_that("db_write_table_volume executes create flow when append is FALSE", {
   con <- make_dbi_test_con()
   state <- new.env(parent = emptyenv())
   state$sql <- NULL
-  state$created <- NULL
   state$uploaded <- NULL
   state$deleted <- NULL
 
   local_mocked_bindings(
     is_valid_volume_path = function(path) path,
     db_volume_dir_exists = function(...) TRUE,
-    db_volume_dir_create = function(path, ...) {
-      state$created <- path
-      invisible(TRUE)
-    },
     db_volume_upload_dir = function(local_dir, volume_dir, ...) {
       state$uploaded <- volume_dir
       invisible(TRUE)
@@ -718,9 +891,8 @@ test_that("db_write_table_volume executes create flow when append is FALSE", {
     )
   )
 
-  expect_match(state$sql, "^CREATE OR REPLACE TABLE")
-  expect_identical(state$created, state$uploaded)
-  expect_identical(state$deleted, state$created)
+  expect_match(state$sql, "^CREATE TABLE .* AS SELECT \\* FROM READ_FILES")
+  expect_identical(state$deleted, state$uploaded)
 })
 
 test_that("db_write_table_volume executes append flow when append is TRUE", {
@@ -728,17 +900,12 @@ test_that("db_write_table_volume executes append flow when append is TRUE", {
   con <- make_dbi_test_con()
   state <- new.env(parent = emptyenv())
   state$sql <- NULL
-  state$created <- NULL
   state$uploaded <- NULL
   state$deleted <- NULL
 
   local_mocked_bindings(
     is_valid_volume_path = function(path) path,
     db_volume_dir_exists = function(...) TRUE,
-    db_volume_dir_create = function(path, ...) {
-      state$created <- path
-      invisible(TRUE)
-    },
     db_volume_upload_dir = function(local_dir, volume_dir, ...) {
       state$uploaded <- volume_dir
       invisible(TRUE)
@@ -773,7 +940,6 @@ test_that("db_write_table_volume executes append flow when append is TRUE", {
     )
   )
 
-  expect_match(state$sql, "^COPY INTO")
-  expect_identical(state$created, state$uploaded)
-  expect_identical(state$deleted, state$created)
+  expect_match(state$sql, "INSERT INTO `tbl` (`x`) SELECT * FROM READ_FILES(", fixed = TRUE)
+  expect_identical(state$deleted, state$uploaded)
 })

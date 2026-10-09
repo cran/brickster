@@ -48,9 +48,8 @@ overflow: visible;
 }
 </style>
 <style type="text/css" data-origin="pandoc">
-html { -webkit-text-size-adjust: 100%; }
 pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span { line-height: 1.25; }
 pre > code.sourceCode > span:empty { height: 1.2em; }
 .sourceCode { overflow: visible; }
 code.sourceCode > span { color: inherit; text-decoration: inherit; }
@@ -61,7 +60,7 @@ div.sourceCode { overflow: auto; }
 }
 @media print {
 pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
 }
 pre.numberSource code
 { counter-reset: source-line 0; }
@@ -375,7 +374,7 @@ devices.</p>
 <p>Very slow with larger write operations.</p></td>
 </tr>
 <tr class="odd">
-<td><a href="https://docs.databricks.com/api/workspace/statementexecution">Statement
+<td><a href="https://docs.databricks.com/api/statement-execution/v1/statement-execution">Statement
 Execution API</a></td>
 <td>Straightforward API that can handle data of all sizes.</td>
 <td>No direct support for write operations.</td>
@@ -399,7 +398,7 @@ Execution API</a></td>
 <p><code>{brickster}</code> now provides both <code>{DBI}</code> and
 <code>{dbplyr}</code> backends for working with Databricks SQL
 warehouses.</p>
-<p>It uses the <a href="https://docs.databricks.com/api/workspace/statementexecution">Statement
+<p>It uses the <a href="https://docs.databricks.com/api/statement-execution/v1/statement-execution">Statement
 Execution API</a> in combination with the <a href="https://docs.databricks.com/api/workspace/files">Files API</a>
 (the latter specifically for large data uploads).</p>
 </div>
@@ -447,13 +446,26 @@ Execution API</a> in combination with the <a href="https://docs.databricks.com/a
 behaviours:</p>
 <ol style="list-style-type: decimal">
 <li>In-line SQL statement write</li>
-<li>Stage <code>.parquet</code> files to a Volume directory and
-<code>COPY INTO</code> or <code>CTAS</code></li>
+<li>Stage <code>.parquet</code> files to a Volume directory, then use
+<code>INSERT INTO</code> or <code>CREATE TABLE AS SELECT</code> (CTAS)
+with <code>READ_FILES</code> as the data source</li>
 </ol>
 <p>For data larger than 50k rows <code>{brickster}</code> will only
 permit the use of method (2), which requires <code>staging_volume</code>
 to be specified when establishing the connection, or directly to
 <code>dbWriteQuery</code>.</p>
+<p>When <code>field.types</code> is supplied, volume-based writes create
+the declared schema before inserting the staged data. For example,
+<code>field.types = c(id = &quot;BIGINT&quot;, amount = &quot;DECIMAL(12, 2)&quot;, code = &quot;VARCHAR(10)&quot;)</code>
+sets those column types; unspecified columns use
+<code>dbDataType()</code>, as in standard writes. Databricks converts
+incoming values and enforces the declared limits. Appends insert into
+the existing schema, including when the data frame’s column order
+differs. Without overrides, table creation infers types from
+Parquet.</p>
+<p>Creating or replacing an explicit schema and loading its data are
+separate SQL statements. If loading fails, the newly created or replaced
+table can be empty.</p>
 <p>Ensure that <code>staging_volume</code> is a valid Volume path and
 you have permission to write files.</p>
 <div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="co"># small data (150 rows)</span></span>

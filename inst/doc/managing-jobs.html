@@ -48,9 +48,8 @@ overflow: visible;
 }
 </style>
 <style type="text/css" data-origin="pandoc">
-html { -webkit-text-size-adjust: 100%; }
 pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span { line-height: 1.25; }
 pre > code.sourceCode > span:empty { height: 1.2em; }
 .sourceCode { overflow: visible; }
 code.sourceCode > span { color: inherit; text-decoration: inherit; }
@@ -61,7 +60,7 @@ div.sourceCode { overflow: auto; }
 }
 @media print {
 pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
 }
 pre.numberSource code
 { counter-reset: source-line 0; }
@@ -347,17 +346,34 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 allowing creation of multi-task jobs via R code.</p>
 <div id="job-basics" class="section level2">
 <h2>Job Basics</h2>
-<p>When listing the jobs the default behaviour is to returns the first
-25 jobs, to configure the number of jobs returned you can specify
-<code>limit</code> and <code>offset</code>.</p>
-<p>The <code>expand_tasks</code> parameter will return task and cluster
-details for each job (default <code>FALSE)</code>.</p>
-<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="co"># list all jobs within Databricks workspace</span></span>
-<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a><span class="co"># can control limit, offset, and if cluster/jobs details are returned</span></span>
-<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a>jobs <span class="ot">&lt;-</span> <span class="fu">db_jobs_list</span>(<span class="at">limit =</span> <span class="dv">10</span>)</span>
+<p><code>db_jobs_list()</code> returns one API response page, with up to
+25 jobs by default. Use <code>limit</code> to change the page size and
+<code>page_token</code> to retrieve another page. Jobs are in the
+response’s <code>$jobs</code> field; run listings use
+<code>$runs</code>.</p>
+<p>The <code>expand_tasks</code> parameter includes task and cluster
+details for each job (default <code>FALSE</code>).</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="co"># list the first page of jobs in the workspace</span></span>
+<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a>page <span class="ot">&lt;-</span> <span class="fu">db_jobs_list</span>(<span class="at">limit =</span> <span class="dv">10</span>)</span>
+<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a>jobs <span class="ot">&lt;-</span> page<span class="sc">$</span>jobs</span>
 <span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a></span>
-<span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a><span class="co"># list all runs within a specific job</span></span>
-<span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a>job_runs <span class="ot">&lt;-</span> <span class="fu">db_jobs_runs_list</span>(<span class="at">job_id =</span> jobs[[<span class="dv">1</span>]]<span class="sc">$</span>job_id)</span></code></pre></div>
+<span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a><span class="co"># retrieve the next page, when available</span></span>
+<span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a><span class="cf">if</span> (<span class="sc">!</span><span class="fu">is.null</span>(page<span class="sc">$</span>next_page_token)) {</span>
+<span id="cb1-7"><a href="#cb1-7" tabindex="-1"></a>  next_page <span class="ot">&lt;-</span> <span class="fu">db_jobs_list</span>(<span class="at">limit =</span> <span class="dv">10</span>, <span class="at">page_token =</span> page<span class="sc">$</span>next_page_token)</span>
+<span id="cb1-8"><a href="#cb1-8" tabindex="-1"></a>}</span>
+<span id="cb1-9"><a href="#cb1-9" tabindex="-1"></a></span>
+<span id="cb1-10"><a href="#cb1-10" tabindex="-1"></a><span class="co"># list the first page of runs for a specific job</span></span>
+<span id="cb1-11"><a href="#cb1-11" tabindex="-1"></a>run_page <span class="ot">&lt;-</span> <span class="fu">db_jobs_runs_list</span>(<span class="at">job_id =</span> jobs[[<span class="dv">1</span>]]<span class="sc">$</span>job_id)</span>
+<span id="cb1-12"><a href="#cb1-12" tabindex="-1"></a>job_runs <span class="ot">&lt;-</span> run_page<span class="sc">$</span>runs</span></code></pre></div>
+<p>Earlier versions returned the jobs or runs directly. Update callers
+to extract <code>$jobs</code> or <code>$runs</code>. Use named arguments
+when calling these functions, as their argument order has changed.</p>
+<p>Numeric <code>offset</code> values are still supported, but the
+default is now <code>NULL</code> to enable token pagination. Run
+listings without a <code>page_token</code> omit continuation tokens when
+an <code>offset</code> is sent, even 0. Leave <code>offset</code> unset
+and use <code>page_token</code> from the preceding response for token
+pagination.</p>
 <p>To return the details of a specific job you can use
 <code>db_jobs_get()</code>, this requires knowledge of the
 <code>job_id</code> which can be found via the user interface in

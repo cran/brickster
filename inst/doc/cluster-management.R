@@ -5,6 +5,9 @@ knitr::opts_chunk$set(
   eval = FALSE
 )
 
+## -----------------------------------------------------------------------------
+# clusters <- db_list_all_pages(db_cluster_list, page_size = 100)
+
 ## ----setup--------------------------------------------------------------------
 # library(brickster)
 # 
@@ -87,8 +90,23 @@ knitr::opts_chunk$set(
 # db_libs_cluster_status(cluster_id = new_cluster$cluster_id)
 
 ## -----------------------------------------------------------------------------
-# events <- db_cluster_events(cluster_id = new_cluster$cluster_id)
-# head(events, 1)
+# page <- db_cluster_events(cluster_id = new_cluster$cluster_id, page_size = 50)
+# head(page$events, 1)
+# if (!is.null(page$next_page_token) && nzchar(page$next_page_token)) {
+#   next_page <- db_cluster_events(
+#     cluster_id = new_cluster$cluster_id,
+#     page_size = 50,
+#     page_token = page$next_page_token
+#   )
+# }
+
+## -----------------------------------------------------------------------------
+# events <- db_list_all_pages(
+#   db_cluster_events,
+#   cluster_id = new_cluster$cluster_id,
+#   event_types = list("RUNNING", "TERMINATING"),
+#   page_size = 500
+# )
 
 ## ----echo=FALSE, results='hide'-----------------------------------------------
 # db_cluster_unpin(cluster_id = new_cluster$cluster_id)

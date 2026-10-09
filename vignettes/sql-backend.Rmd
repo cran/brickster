@@ -30,11 +30,13 @@ Connecting to Databricks SQL Warehouses *typically* involves using one of the me
 |                                                                                         |                                                                               |                                                                      |
 |                                                                                         |                                                                               | Very slow with larger write operations.                              |
 +-----------------------------------------------------------------------------------------+-------------------------------------------------------------------------------+----------------------------------------------------------------------+
-| [Statement Execution API](https://docs.databricks.com/api/workspace/statementexecution) | Straightforward API that can handle data of all sizes.                        | No direct support for write operations.                              |
+| [Statement Execution API][statement-execution]                                          | Straightforward API that can handle data of all sizes.                        | No direct support for write operations.                              |
 +-----------------------------------------------------------------------------------------+-------------------------------------------------------------------------------+----------------------------------------------------------------------+
 | Databricks SQL Connector\                                                               | Convenient to work with and good performance.                                 | It's in Python, requires `{reticulate}`.                             |
 | (`databricks-sql-connector`)                                                            |                                                                               |                                                                      |
 +-----------------------------------------------------------------------------------------+-------------------------------------------------------------------------------+----------------------------------------------------------------------+
+
+[statement-execution]: https://docs.databricks.com/api/statement-execution/v1/statement-execution
 
 That leaves a void for something that is:
 
@@ -50,7 +52,7 @@ That leaves a void for something that is:
 
 `{brickster}` now provides both `{DBI}` and `{dbplyr}` backends for working with Databricks SQL warehouses.
 
-It uses the [Statement Execution API](https://docs.databricks.com/api/workspace/statementexecution) in combination with the [Files API](https://docs.databricks.com/api/workspace/files) (the latter specifically for large data uploads).
+It uses the [Statement Execution API](https://docs.databricks.com/api/statement-execution/v1/statement-execution) in combination with the [Files API](https://docs.databricks.com/api/workspace/files) (the latter specifically for large data uploads).
 
 ## Connecting to a Warehouse
 
@@ -103,9 +105,20 @@ dbListFields(con, Id("samples", "nyctaxi", "trips"))
 When writing data (append, overwrite, etc) there are two possible behaviours:
 
 1.  In-line SQL statement write
-2.  Stage `.parquet` files to a Volume directory and `COPY INTO` or `CTAS`
+2.  Stage `.parquet` files to a Volume directory, then use `INSERT INTO` or `CREATE TABLE AS SELECT` (CTAS) with `READ_FILES` as the data source
 
 For data larger than 50k rows `{brickster}` will only permit the use of method (2), which requires `staging_volume` to be specified when establishing the connection, or directly to `dbWriteQuery`.
+
+When `field.types` is supplied, volume-based writes create the declared schema
+before inserting the staged data. For example,
+`field.types = c(id = "BIGINT", amount = "DECIMAL(12, 2)", code = "VARCHAR(10)")`
+sets those column types; unspecified columns use `dbDataType()`, as in standard
+writes. Databricks converts incoming values and enforces the declared limits.
+Appends insert into the existing schema, including when the data frame's column
+order differs. Without overrides, table creation infers types from Parquet.
+
+Creating or replacing an explicit schema and loading its data are separate SQL
+statements. If loading fails, the newly created or replaced table can be empty.
 
 Ensure that `staging_volume` is a valid Volume path and you have permission to write files.
 
