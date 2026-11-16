@@ -419,26 +419,66 @@ Execution API</a> in combination with the <a href="https://docs.databricks.com/a
 <span id="cb1-11"><a href="#cb1-11" tabindex="-1"></a>  <span class="at">show_progress =</span> <span class="cn">FALSE</span></span>
 <span id="cb1-12"><a href="#cb1-12" tabindex="-1"></a>)</span></code></pre></div>
 </div>
+<div id="query-tags" class="section level2">
+<h2>Query tags</h2>
+<p>Use <code>query_tags</code> to attribute SQL executions to a team,
+project, or environment:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a>trips <span class="ot">&lt;-</span> <span class="fu">db_sql_query</span>(</span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a>  <span class="at">warehouse_id =</span> <span class="st">&quot;&lt;your_warehouse_id&gt;&quot;</span>,</span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a>  <span class="at">statement =</span> <span class="st">&quot;SELECT * FROM samples.nyctaxi.trips LIMIT 10&quot;</span>,</span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a>  <span class="at">query_tags =</span> <span class="fu">list</span>(<span class="at">team =</span> <span class="st">&quot;informatics&quot;</span>, <span class="at">project =</span> <span class="st">&quot;disease_surveillance&quot;</span>)</span>
+<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a>)</span></code></pre></div>
+<p><code>db_sql_exec_query()</code> accepts the same tags.</p>
+<p>For DBI, set defaults when connecting:</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>con <span class="ot">&lt;-</span> <span class="fu">dbConnect</span>(</span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>  <span class="fu">DatabricksSQL</span>(),</span>
+<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a>  <span class="at">warehouse_id =</span> <span class="st">&quot;&lt;your_warehouse_id&gt;&quot;</span>,</span>
+<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>  <span class="at">query_tags =</span> <span class="fu">list</span>(<span class="at">team =</span> <span class="st">&quot;informatics&quot;</span>, <span class="at">environment =</span> <span class="st">&quot;dev&quot;</span>)</span>
+<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a>)</span>
+<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a></span>
+<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a><span class="co"># Uses the connection defaults</span></span>
+<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a><span class="fu">dbGetQuery</span>(con, <span class="st">&quot;SELECT 1&quot;</span>)</span>
+<span id="cb3-9"><a href="#cb3-9" tabindex="-1"></a></span>
+<span id="cb3-10"><a href="#cb3-10" tabindex="-1"></a><span class="co"># Replaces all defaults for this statement only</span></span>
+<span id="cb3-11"><a href="#cb3-11" tabindex="-1"></a><span class="fu">dbGetQuery</span>(con, <span class="st">&quot;SELECT 1&quot;</span>, <span class="at">query_tags =</span> <span class="fu">list</span>(<span class="at">project =</span> <span class="st">&quot;ad_hoc&quot;</span>))</span>
+<span id="cb3-12"><a href="#cb3-12" tabindex="-1"></a></span>
+<span id="cb3-13"><a href="#cb3-13" tabindex="-1"></a><span class="co"># Omits tags for this statement only</span></span>
+<span id="cb3-14"><a href="#cb3-14" tabindex="-1"></a><span class="fu">dbGetQuery</span>(con, <span class="st">&quot;SELECT 1&quot;</span>, <span class="at">query_tags =</span> <span class="cn">NULL</span>)</span></code></pre></div>
+<p>Overrides also work with <code>dbSendQuery()</code>,
+<code>dbExecute()</code>, and <code>dbSendStatement()</code>. The next
+call uses the connection defaults again.</p>
+<p>With access to <code>system.query.history</code>, inspect the
+submitted tags:</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="fu">dbGetQuery</span>(con, <span class="st">&quot;</span></span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a><span class="st">  SELECT statement_id, statement_text, query_tags</span></span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a><span class="st">  FROM system.query.history</span></span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a><span class="st">  WHERE query_tags[&#39;team&#39;] = &#39;informatics&#39;</span></span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a><span class="st">  ORDER BY start_time DESC</span></span>
+<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a><span class="st">  LIMIT 20</span></span>
+<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a><span class="st">&quot;</span>)</span></code></pre></div>
+<p>Learn more in the <a href="https://docs.databricks.com/aws/en/sql/user/queries/query-tags">Databricks
+query tags documentation</a>.</p>
+</div>
 <div id="dbi-backend" class="section level2">
 <h2><code>{DBI}</code> Backend</h2>
 <div id="reading-data" class="section level3">
 <h3>Reading Data</h3>
 <p>Execute SQL directly and return results as data frames:</p>
-<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a>trips <span class="ot">&lt;-</span> <span class="fu">dbGetQuery</span>(con, <span class="st">&quot;SELECT * FROM samples.nyctaxi.trips LIMIT 10&quot;</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a>trips <span class="ot">&lt;-</span> <span class="fu">dbGetQuery</span>(con, <span class="st">&quot;SELECT * FROM samples.nyctaxi.trips LIMIT 10&quot;</span>)</span></code></pre></div>
 <p>Tables can be references either via <code>Id()</code>,
 <code>I()</code>, or using the name as-is:</p>
-<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="co"># List available tables</span></span>
-<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>tables <span class="ot">&lt;-</span> <span class="fu">dbListTables</span>(con)</span>
-<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a></span>
-<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a><span class="co"># Check if specific table exists</span></span>
-<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a><span class="fu">dbExistsTable</span>(con, <span class="st">&quot;samples.nyctaxi.trips&quot;</span>)</span>
-<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a><span class="fu">dbExistsTable</span>(con, <span class="fu">I</span>(<span class="st">&quot;samples.nyctaxi.trips&quot;</span>))</span>
-<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a><span class="fu">dbExistsTable</span>(con, <span class="fu">Id</span>(<span class="st">&quot;samples&quot;</span>, <span class="st">&quot;nyctaxi&quot;</span>, <span class="st">&quot;trips&quot;</span>))</span>
-<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a></span>
-<span id="cb3-9"><a href="#cb3-9" tabindex="-1"></a><span class="co"># Get column information</span></span>
-<span id="cb3-10"><a href="#cb3-10" tabindex="-1"></a><span class="fu">dbListFields</span>(con, <span class="st">&quot;samples.nyctaxi.trips&quot;</span>)</span>
-<span id="cb3-11"><a href="#cb3-11" tabindex="-1"></a><span class="fu">dbListFields</span>(con, <span class="fu">I</span>(<span class="st">&quot;samples.nyctaxi.trips&quot;</span>))</span>
-<span id="cb3-12"><a href="#cb3-12" tabindex="-1"></a><span class="fu">dbListFields</span>(con, <span class="fu">Id</span>(<span class="st">&quot;samples&quot;</span>, <span class="st">&quot;nyctaxi&quot;</span>, <span class="st">&quot;trips&quot;</span>))</span></code></pre></div>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="co"># List available tables</span></span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>tables <span class="ot">&lt;-</span> <span class="fu">dbListTables</span>(con)</span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a></span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a><span class="co"># Check if specific table exists</span></span>
+<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a><span class="fu">dbExistsTable</span>(con, <span class="st">&quot;samples.nyctaxi.trips&quot;</span>)</span>
+<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a><span class="fu">dbExistsTable</span>(con, <span class="fu">I</span>(<span class="st">&quot;samples.nyctaxi.trips&quot;</span>))</span>
+<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a><span class="fu">dbExistsTable</span>(con, <span class="fu">Id</span>(<span class="st">&quot;samples&quot;</span>, <span class="st">&quot;nyctaxi&quot;</span>, <span class="st">&quot;trips&quot;</span>))</span>
+<span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a></span>
+<span id="cb6-9"><a href="#cb6-9" tabindex="-1"></a><span class="co"># Get column information</span></span>
+<span id="cb6-10"><a href="#cb6-10" tabindex="-1"></a><span class="fu">dbListFields</span>(con, <span class="st">&quot;samples.nyctaxi.trips&quot;</span>)</span>
+<span id="cb6-11"><a href="#cb6-11" tabindex="-1"></a><span class="fu">dbListFields</span>(con, <span class="fu">I</span>(<span class="st">&quot;samples.nyctaxi.trips&quot;</span>))</span>
+<span id="cb6-12"><a href="#cb6-12" tabindex="-1"></a><span class="fu">dbListFields</span>(con, <span class="fu">Id</span>(<span class="st">&quot;samples&quot;</span>, <span class="st">&quot;nyctaxi&quot;</span>, <span class="st">&quot;trips&quot;</span>))</span></code></pre></div>
 </div>
 <div id="writing-data" class="section level3">
 <h3>Writing Data</h3>
@@ -468,27 +508,27 @@ separate SQL statements. If loading fails, the newly created or replaced
 table can be empty.</p>
 <p>Ensure that <code>staging_volume</code> is a valid Volume path and
 you have permission to write files.</p>
-<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="co"># small data (150 rows)</span></span>
-<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a><span class="co"># creates the table schema explicitly then inserts rows inline</span></span>
-<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a><span class="fu">dbWriteTable</span>(</span>
-<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>  <span class="at">conn =</span> con,</span>
-<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>  <span class="at">name =</span> <span class="fu">Id</span>(<span class="at">catalog =</span> <span class="st">&quot;&lt;catalog&gt;&quot;</span>, <span class="at">schema =</span> <span class="st">&quot;&lt;schema&gt;&quot;</span>, <span class="at">table =</span> <span class="st">&quot;&lt;table&gt;&quot;</span>),</span>
-<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a>  <span class="at">value =</span> iris,</span>
-<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a>  <span class="at">overwrite =</span> <span class="cn">TRUE</span></span>
-<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a>)</span>
-<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a></span>
-<span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a><span class="co"># bigger data (4 million rows)</span></span>
-<span id="cb4-11"><a href="#cb4-11" tabindex="-1"></a><span class="co"># writes parquet files to volume then CTAS</span></span>
-<span id="cb4-12"><a href="#cb4-12" tabindex="-1"></a>iris_big <span class="ot">&lt;-</span> <span class="fu">sample_n</span>(iris, <span class="at">replace =</span> <span class="cn">TRUE</span>, <span class="at">size =</span> <span class="dv">4000000</span>)</span>
-<span id="cb4-13"><a href="#cb4-13" tabindex="-1"></a></span>
-<span id="cb4-14"><a href="#cb4-14" tabindex="-1"></a><span class="fu">dbWriteTable</span>(</span>
-<span id="cb4-15"><a href="#cb4-15" tabindex="-1"></a>  <span class="at">conn =</span> con,</span>
-<span id="cb4-16"><a href="#cb4-16" tabindex="-1"></a>  <span class="at">name =</span> <span class="fu">Id</span>(<span class="at">catalog =</span> <span class="st">&quot;&lt;catalog&gt;&quot;</span>, <span class="at">schema =</span> <span class="st">&quot;&lt;schema&gt;&quot;</span>, <span class="at">table =</span> <span class="st">&quot;&lt;table&gt;&quot;</span>),</span>
-<span id="cb4-17"><a href="#cb4-17" tabindex="-1"></a>  <span class="at">value =</span> iris_big,</span>
-<span id="cb4-18"><a href="#cb4-18" tabindex="-1"></a>  <span class="at">overwrite =</span> <span class="cn">TRUE</span>,</span>
-<span id="cb4-19"><a href="#cb4-19" tabindex="-1"></a>  <span class="at">staging_volume =</span> <span class="st">&quot;/Volumes/&lt;catalog&gt;/&lt;schema&gt;/&lt;volume&gt;/...&quot;</span>, <span class="co"># or inherited from connection</span></span>
-<span id="cb4-20"><a href="#cb4-20" tabindex="-1"></a>  <span class="at">show_progress =</span> <span class="cn">TRUE</span></span>
-<span id="cb4-21"><a href="#cb4-21" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a><span class="co"># small data (150 rows)</span></span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a><span class="co"># creates the table schema explicitly then inserts rows inline</span></span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a><span class="fu">dbWriteTable</span>(</span>
+<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a>  <span class="at">conn =</span> con,</span>
+<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a>  <span class="at">name =</span> <span class="fu">Id</span>(<span class="at">catalog =</span> <span class="st">&quot;&lt;catalog&gt;&quot;</span>, <span class="at">schema =</span> <span class="st">&quot;&lt;schema&gt;&quot;</span>, <span class="at">table =</span> <span class="st">&quot;&lt;table&gt;&quot;</span>),</span>
+<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a>  <span class="at">value =</span> iris,</span>
+<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a>  <span class="at">overwrite =</span> <span class="cn">TRUE</span></span>
+<span id="cb7-8"><a href="#cb7-8" tabindex="-1"></a>)</span>
+<span id="cb7-9"><a href="#cb7-9" tabindex="-1"></a></span>
+<span id="cb7-10"><a href="#cb7-10" tabindex="-1"></a><span class="co"># bigger data (4 million rows)</span></span>
+<span id="cb7-11"><a href="#cb7-11" tabindex="-1"></a><span class="co"># writes parquet files to volume then CTAS</span></span>
+<span id="cb7-12"><a href="#cb7-12" tabindex="-1"></a>iris_big <span class="ot">&lt;-</span> <span class="fu">sample_n</span>(iris, <span class="at">replace =</span> <span class="cn">TRUE</span>, <span class="at">size =</span> <span class="dv">4000000</span>)</span>
+<span id="cb7-13"><a href="#cb7-13" tabindex="-1"></a></span>
+<span id="cb7-14"><a href="#cb7-14" tabindex="-1"></a><span class="fu">dbWriteTable</span>(</span>
+<span id="cb7-15"><a href="#cb7-15" tabindex="-1"></a>  <span class="at">conn =</span> con,</span>
+<span id="cb7-16"><a href="#cb7-16" tabindex="-1"></a>  <span class="at">name =</span> <span class="fu">Id</span>(<span class="at">catalog =</span> <span class="st">&quot;&lt;catalog&gt;&quot;</span>, <span class="at">schema =</span> <span class="st">&quot;&lt;schema&gt;&quot;</span>, <span class="at">table =</span> <span class="st">&quot;&lt;table&gt;&quot;</span>),</span>
+<span id="cb7-17"><a href="#cb7-17" tabindex="-1"></a>  <span class="at">value =</span> iris_big,</span>
+<span id="cb7-18"><a href="#cb7-18" tabindex="-1"></a>  <span class="at">overwrite =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb7-19"><a href="#cb7-19" tabindex="-1"></a>  <span class="at">staging_volume =</span> <span class="st">&quot;/Volumes/&lt;catalog&gt;/&lt;schema&gt;/&lt;volume&gt;/...&quot;</span>, <span class="co"># or inherited from connection</span></span>
+<span id="cb7-20"><a href="#cb7-20" tabindex="-1"></a>  <span class="at">show_progress =</span> <span class="cn">TRUE</span></span>
+<span id="cb7-21"><a href="#cb7-21" tabindex="-1"></a>)</span></code></pre></div>
 </div>
 </div>
 <div id="dbplyr-backend" class="section level2">
@@ -498,46 +538,46 @@ you have permission to write files.</p>
 <p>As in the <code>{DBI}</code> backend tables can be referenced either
 via <code>Id()</code>, <code>I()</code>, or using the name as-is in
 <code>tbl()</code>:</p>
-<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="co"># Connect to existing tables</span></span>
-<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a><span class="fu">tbl</span>(con, <span class="st">&quot;samples.nyctaxi.trips&quot;</span>)</span>
-<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a><span class="fu">tbl</span>(con, <span class="fu">I</span>(<span class="st">&quot;samples.nyctaxi.trips&quot;</span>))</span>
-<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a><span class="fu">tbl</span>(con, <span class="fu">Id</span>(<span class="st">&quot;samples&quot;</span>, <span class="st">&quot;nyctaxi&quot;</span>, <span class="st">&quot;trips&quot;</span>))</span>
-<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a><span class="fu">tbl</span>(con, <span class="fu">in_catalog</span>(<span class="st">&quot;samples&quot;</span>, <span class="st">&quot;nyctaxi&quot;</span>, <span class="st">&quot;trips&quot;</span>))</span></code></pre></div>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="co"># Connect to existing tables</span></span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a><span class="fu">tbl</span>(con, <span class="st">&quot;samples.nyctaxi.trips&quot;</span>)</span>
+<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a><span class="fu">tbl</span>(con, <span class="fu">I</span>(<span class="st">&quot;samples.nyctaxi.trips&quot;</span>))</span>
+<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a><span class="fu">tbl</span>(con, <span class="fu">Id</span>(<span class="st">&quot;samples&quot;</span>, <span class="st">&quot;nyctaxi&quot;</span>, <span class="st">&quot;trips&quot;</span>))</span>
+<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a><span class="fu">tbl</span>(con, <span class="fu">in_catalog</span>(<span class="st">&quot;samples&quot;</span>, <span class="st">&quot;nyctaxi&quot;</span>, <span class="st">&quot;trips&quot;</span>))</span></code></pre></div>
 <p>Chain dplyr operations - they execute remotely on Databricks:</p>
-<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="co"># Filter and select (translated to SQL)</span></span>
-<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>long_trips <span class="ot">&lt;-</span> <span class="fu">tbl</span>(con, <span class="st">&quot;samples.nyctaxi.trips&quot;</span>) <span class="sc">|&gt;</span></span>
-<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>  <span class="fu">filter</span>(trip_distance <span class="sc">&gt;</span> <span class="dv">10</span>) <span class="sc">|&gt;</span></span>
-<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>  <span class="fu">select</span>(</span>
-<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>    tpep_pickup_datetime,</span>
-<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a>    tpep_dropoff_datetime,</span>
-<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a>    trip_distance,</span>
-<span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a>    fare_amount</span>
-<span id="cb6-9"><a href="#cb6-9" tabindex="-1"></a>  )</span>
-<span id="cb6-10"><a href="#cb6-10" tabindex="-1"></a></span>
-<span id="cb6-11"><a href="#cb6-11" tabindex="-1"></a><span class="co"># View the generated SQL (without executing)</span></span>
-<span id="cb6-12"><a href="#cb6-12" tabindex="-1"></a><span class="fu">show_query</span>(long_trips)</span>
-<span id="cb6-13"><a href="#cb6-13" tabindex="-1"></a></span>
-<span id="cb6-14"><a href="#cb6-14" tabindex="-1"></a><span class="co"># Execute and collect results</span></span>
-<span id="cb6-15"><a href="#cb6-15" tabindex="-1"></a>long_trips <span class="sc">|&gt;</span> <span class="fu">collect</span>()</span></code></pre></div>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a><span class="co"># Filter and select (translated to SQL)</span></span>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a>long_trips <span class="ot">&lt;-</span> <span class="fu">tbl</span>(con, <span class="st">&quot;samples.nyctaxi.trips&quot;</span>) <span class="sc">|&gt;</span></span>
+<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a>  <span class="fu">filter</span>(trip_distance <span class="sc">&gt;</span> <span class="dv">10</span>) <span class="sc">|&gt;</span></span>
+<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a>  <span class="fu">select</span>(</span>
+<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a>    tpep_pickup_datetime,</span>
+<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a>    tpep_dropoff_datetime,</span>
+<span id="cb9-7"><a href="#cb9-7" tabindex="-1"></a>    trip_distance,</span>
+<span id="cb9-8"><a href="#cb9-8" tabindex="-1"></a>    fare_amount</span>
+<span id="cb9-9"><a href="#cb9-9" tabindex="-1"></a>  )</span>
+<span id="cb9-10"><a href="#cb9-10" tabindex="-1"></a></span>
+<span id="cb9-11"><a href="#cb9-11" tabindex="-1"></a><span class="co"># View the generated SQL (without executing)</span></span>
+<span id="cb9-12"><a href="#cb9-12" tabindex="-1"></a><span class="fu">show_query</span>(long_trips)</span>
+<span id="cb9-13"><a href="#cb9-13" tabindex="-1"></a></span>
+<span id="cb9-14"><a href="#cb9-14" tabindex="-1"></a><span class="co"># Execute and collect results</span></span>
+<span id="cb9-15"><a href="#cb9-15" tabindex="-1"></a>long_trips <span class="sc">|&gt;</span> <span class="fu">collect</span>()</span></code></pre></div>
 <p>As a general reminder, call <code>collect()</code> at the latest
 point possible in your analysis to take reduce the required computation
 locally.</p>
-<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a><span class="co"># Customer summary statistics</span></span>
-<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>trips_summary <span class="ot">&lt;-</span> <span class="fu">tbl</span>(con, <span class="st">&quot;samples.nyctaxi.trips&quot;</span>) <span class="sc">|&gt;</span></span>
-<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>  <span class="fu">group_by</span>(pickup_zip) <span class="sc">%&gt;%</span></span>
-<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a>  <span class="fu">summarise</span>(</span>
-<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a>    <span class="at">trip_count =</span> <span class="fu">n</span>(),</span>
-<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a>    <span class="at">total_fare_amount =</span> <span class="fu">sum</span>(fare_amount, <span class="at">na.rm =</span> <span class="cn">TRUE</span>),</span>
-<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a>    <span class="at">total_trip_distance =</span> <span class="fu">sum</span>(trip_distance, <span class="at">na.rm =</span> <span class="cn">TRUE</span>),</span>
-<span id="cb7-8"><a href="#cb7-8" tabindex="-1"></a>    <span class="at">avg_fare_amount =</span> <span class="fu">mean</span>(fare_amount, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)</span>
-<span id="cb7-9"><a href="#cb7-9" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
-<span id="cb7-10"><a href="#cb7-10" tabindex="-1"></a>  <span class="fu">arrange</span>(<span class="fu">desc</span>(avg_fare_amount))</span>
-<span id="cb7-11"><a href="#cb7-11" tabindex="-1"></a></span>
-<span id="cb7-12"><a href="#cb7-12" tabindex="-1"></a><span class="co"># Execute to get the 20 most expensive pickip zip codes with more than 30 trips</span></span>
-<span id="cb7-13"><a href="#cb7-13" tabindex="-1"></a>top_zipz <span class="ot">&lt;-</span> trips_summary <span class="sc">|&gt;</span></span>
-<span id="cb7-14"><a href="#cb7-14" tabindex="-1"></a>  <span class="fu">filter</span>(trip_count <span class="sc">&gt;</span> <span class="dv">20</span>) <span class="sc">|&gt;</span></span>
-<span id="cb7-15"><a href="#cb7-15" tabindex="-1"></a>  <span class="fu">head</span>(<span class="dv">20</span>) <span class="sc">|&gt;</span></span>
-<span id="cb7-16"><a href="#cb7-16" tabindex="-1"></a>  <span class="fu">collect</span>()</span></code></pre></div>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a><span class="co"># Customer summary statistics</span></span>
+<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a>trips_summary <span class="ot">&lt;-</span> <span class="fu">tbl</span>(con, <span class="st">&quot;samples.nyctaxi.trips&quot;</span>) <span class="sc">|&gt;</span></span>
+<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a>  <span class="fu">group_by</span>(pickup_zip) <span class="sc">%&gt;%</span></span>
+<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a>  <span class="fu">summarise</span>(</span>
+<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a>    <span class="at">trip_count =</span> <span class="fu">n</span>(),</span>
+<span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a>    <span class="at">total_fare_amount =</span> <span class="fu">sum</span>(fare_amount, <span class="at">na.rm =</span> <span class="cn">TRUE</span>),</span>
+<span id="cb10-7"><a href="#cb10-7" tabindex="-1"></a>    <span class="at">total_trip_distance =</span> <span class="fu">sum</span>(trip_distance, <span class="at">na.rm =</span> <span class="cn">TRUE</span>),</span>
+<span id="cb10-8"><a href="#cb10-8" tabindex="-1"></a>    <span class="at">avg_fare_amount =</span> <span class="fu">mean</span>(fare_amount, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb10-9"><a href="#cb10-9" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
+<span id="cb10-10"><a href="#cb10-10" tabindex="-1"></a>  <span class="fu">arrange</span>(<span class="fu">desc</span>(avg_fare_amount))</span>
+<span id="cb10-11"><a href="#cb10-11" tabindex="-1"></a></span>
+<span id="cb10-12"><a href="#cb10-12" tabindex="-1"></a><span class="co"># Execute to get the 20 most expensive pickip zip codes with more than 30 trips</span></span>
+<span id="cb10-13"><a href="#cb10-13" tabindex="-1"></a>top_zipz <span class="ot">&lt;-</span> trips_summary <span class="sc">|&gt;</span></span>
+<span id="cb10-14"><a href="#cb10-14" tabindex="-1"></a>  <span class="fu">filter</span>(trip_count <span class="sc">&gt;</span> <span class="dv">20</span>) <span class="sc">|&gt;</span></span>
+<span id="cb10-15"><a href="#cb10-15" tabindex="-1"></a>  <span class="fu">head</span>(<span class="dv">20</span>) <span class="sc">|&gt;</span></span>
+<span id="cb10-16"><a href="#cb10-16" tabindex="-1"></a>  <span class="fu">collect</span>()</span></code></pre></div>
 </div>
 </div>
 <div id="writing-data-1" class="section level2">
@@ -546,13 +586,13 @@ locally.</p>
 makes functions like <code>copy_to</code> only usable when specifying
 <code>temporary</code> as <code>FALSE</code> which will use
 <code>dbWriteTable</code> to create a table.</p>
-<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>iris_remote <span class="ot">&lt;-</span> <span class="fu">copy_to</span>(</span>
-<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>  con,</span>
-<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a>  iris,</span>
-<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a>  <span class="st">&quot;iris_table&quot;</span>,</span>
-<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a>  <span class="at">temporary =</span> <span class="cn">FALSE</span>,</span>
-<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a>  <span class="at">overwrite =</span> <span class="cn">TRUE</span></span>
-<span id="cb8-7"><a href="#cb8-7" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a>iris_remote <span class="ot">&lt;-</span> <span class="fu">copy_to</span>(</span>
+<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a>  con,</span>
+<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a>  iris,</span>
+<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a>  <span class="st">&quot;iris_table&quot;</span>,</span>
+<span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a>  <span class="at">temporary =</span> <span class="cn">FALSE</span>,</span>
+<span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a>  <span class="at">overwrite =</span> <span class="cn">TRUE</span></span>
+<span id="cb11-7"><a href="#cb11-7" tabindex="-1"></a>)</span></code></pre></div>
 </div>
 <div id="connection-management" class="section level2">
 <h2>Connection Management</h2>

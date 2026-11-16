@@ -1,3 +1,9 @@
+# brickster 0.2.16
+
+-   `db_volume_file_exists()` and `db_volume_dir_exists()` now return `FALSE` for missing paths (HTTP 404), allowing volume-backed `dbWriteTable()` to report a missing staging directory. Other HTTP errors still propagate (#320).
+-   `db_sql_exec_query()` and `db_sql_query()` now accept execution-level `query_tags` as a named list. DBI connections can set default tags with `dbConnect(query_tags = ...)`; `dbGetQuery()`, `dbSendQuery()`, `dbExecute()`, and `dbSendStatement()` can replace them per statement or omit them with `query_tags = NULL` (#318).
+-   Volume-backed `dbWriteTable()` no longer uses the random seed to name staging directories (#316, @m-muecke).
+
 # brickster 0.2.15
 
 -   The workspace Connections pane identifies managed and foreign Iceberg tables as `ICEBERG`, distinguishes Delta tables with Iceberg reads as `DELTA (UniForm: Iceberg)`, and shows Iceberg metadata instead of Delta protocol versions. Tables without a source format, including metric views, no longer fail when opening metadata (#311, @zacdav).

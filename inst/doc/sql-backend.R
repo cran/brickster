@@ -20,6 +20,38 @@ knitr::opts_chunk$set(
 # )
 
 ## -----------------------------------------------------------------------------
+# trips <- db_sql_query(
+#   warehouse_id = "<your_warehouse_id>",
+#   statement = "SELECT * FROM samples.nyctaxi.trips LIMIT 10",
+#   query_tags = list(team = "informatics", project = "disease_surveillance")
+# )
+
+## -----------------------------------------------------------------------------
+# con <- dbConnect(
+#   DatabricksSQL(),
+#   warehouse_id = "<your_warehouse_id>",
+#   query_tags = list(team = "informatics", environment = "dev")
+# )
+# 
+# # Uses the connection defaults
+# dbGetQuery(con, "SELECT 1")
+# 
+# # Replaces all defaults for this statement only
+# dbGetQuery(con, "SELECT 1", query_tags = list(project = "ad_hoc"))
+# 
+# # Omits tags for this statement only
+# dbGetQuery(con, "SELECT 1", query_tags = NULL)
+
+## -----------------------------------------------------------------------------
+# dbGetQuery(con, "
+#   SELECT statement_id, statement_text, query_tags
+#   FROM system.query.history
+#   WHERE query_tags['team'] = 'informatics'
+#   ORDER BY start_time DESC
+#   LIMIT 20
+# ")
+
+## -----------------------------------------------------------------------------
 # trips <- dbGetQuery(con, "SELECT * FROM samples.nyctaxi.trips LIMIT 10")
 
 ## -----------------------------------------------------------------------------
